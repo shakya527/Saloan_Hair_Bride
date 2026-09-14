@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!mobileToggle || !navMenu) return;
     mobileToggle.classList.add('active');
     mobileToggle.setAttribute('aria-expanded', 'true');
+    navMenu.classList.add('active');
     navMenu.classList.add('open');
     if (navOverlay) navOverlay.classList.add('active');
     document.body.style.overflow = 'hidden'; // Prevent background scrolling
@@ -37,14 +38,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!mobileToggle || !navMenu) return;
     mobileToggle.classList.remove('active');
     mobileToggle.setAttribute('aria-expanded', 'false');
+    navMenu.classList.remove('active');
     navMenu.classList.remove('open');
     if (navOverlay) navOverlay.classList.remove('active');
     document.body.style.overflow = '';
   }
 
   if (mobileToggle) {
-    mobileToggle.addEventListener('click', () => {
-      const isOpen = navMenu.classList.contains('open');
+    mobileToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = navMenu.classList.contains('active') || navMenu.classList.contains('open');
       if (isOpen) {
         closeMobileNav();
       } else {
@@ -449,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (lightboxModal && lightboxModal.classList.contains('active')) {
         closeLightbox();
       }
-      if (navMenu && navMenu.classList.contains('open')) {
+      if (navMenu && (navMenu.classList.contains('active') || navMenu.classList.contains('open'))) {
         closeMobileNav();
       }
     }

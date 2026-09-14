@@ -58,7 +58,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   2. RESET & BASE ELEMENTS
+   2. RESET & BASE ELEMENTS (STRICT 100% WIDTH & NO HORIZONTAL SCROLL)
    -------------------------------------------------------------------------- */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -70,6 +70,10 @@ html {
   scroll-behavior: smooth;
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 body {
@@ -77,32 +81,32 @@ body {
   color: var(--color-text-main);
   background-color: var(--color-cream);
   line-height: 1.65;
+  width: 100%;
+  max-width: 100%;
   overflow-x: hidden;
   position: relative;
+  box-sizing: border-box;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Accessibility Skip Link */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 20px;
-  background: var(--color-primary);
-  color: var(--color-dark);
-  padding: 8px 16px;
-  z-index: 10000;
-  font-weight: 600;
-  transition: top 0.2s;
-}
-.skip-link:focus {
-  top: 20px;
+/* Ensure all major landmark sections stay strictly within 100% viewport width */
+.top-bar,
+.site-header,
+main,
+section,
+footer {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 img {
   max-width: 100%;
   height: auto;
   display: block;
+  box-sizing: border-box;
 }
 
 a {
@@ -120,6 +124,7 @@ button, input, select, textarea {
   font-size: 1rem;
   border: none;
   outline: none;
+  box-sizing: border-box;
 }
 
 /* --------------------------------------------------------------------------
@@ -132,6 +137,7 @@ button, input, select, textarea {
   margin-right: auto;
   padding-left: var(--container-padding);
   padding-right: var(--container-padding);
+  box-sizing: border-box;
 }
 
 .text-center {
@@ -188,6 +194,7 @@ button, input, select, textarea {
   cursor: pointer;
   transition: var(--transition-standard);
   white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .btn-primary {
@@ -374,8 +381,9 @@ button, input, select, textarea {
   text-transform: uppercase;
 }
 
-/* Navigation Links */
-.nav-menu {
+/* Navigation Links (Desktop) */
+.nav-menu,
+.nav-links {
   display: flex;
   align-items: center;
 }
@@ -468,6 +476,8 @@ button, input, select, textarea {
   background: radial-gradient(circle at 10% 20%, rgba(197, 168, 128, 0.12) 0%, transparent 50%),
               radial-gradient(circle at 90% 80%, rgba(197, 168, 128, 0.08) 0%, transparent 40%),
               var(--color-cream);
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .hero-container {
@@ -475,6 +485,7 @@ button, input, select, textarea {
   grid-template-columns: 1.15fr 0.85fr;
   gap: 3.5rem;
   align-items: center;
+  width: 100%;
 }
 
 .eyebrow-tag {
@@ -578,12 +589,14 @@ button, input, select, textarea {
 /* Hero Image Visual */
 .hero-visual {
   position: relative;
+  width: 100%;
 }
 
 .hero-image-frame {
   position: relative;
   border-radius: var(--border-radius-lg);
   overflow: visible;
+  max-width: 100%;
 }
 
 .hero-img {
@@ -597,8 +610,8 @@ button, input, select, textarea {
 
 .hero-floating-card {
   position: absolute;
-  bottom: -24px;
-  left: -24px;
+  bottom: -20px;
+  left: 0;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   padding: 1rem 1.375rem;
@@ -609,6 +622,8 @@ button, input, select, textarea {
   gap: 0.875rem;
   border: 1px solid rgba(197, 168, 128, 0.3);
   z-index: 2;
+  box-sizing: border-box;
+  max-width: 95%;
 }
 
 .floating-icon {
@@ -620,6 +635,7 @@ button, input, select, textarea {
   align-items: center;
   justify-content: center;
   color: var(--color-primary-dark);
+  flex-shrink: 0;
 }
 
 .floating-icon svg {
@@ -680,10 +696,12 @@ button, input, select, textarea {
 
 .about-image-wrapper {
   position: relative;
+  width: 100%;
 }
 
 .about-img-frame {
   position: relative;
+  max-width: 100%;
 }
 
 .about-img {
@@ -746,6 +764,7 @@ button, input, select, textarea {
   grid-template-columns: 1fr 1fr;
   gap: 1.25rem;
   margin-bottom: 2.5rem;
+  width: 100%;
 }
 
 .about-feature-card {
@@ -757,6 +776,7 @@ button, input, select, textarea {
   border-radius: var(--border-radius-md);
   border: 1px solid var(--color-border);
   transition: var(--transition-standard);
+  box-sizing: border-box;
 }
 
 .about-feature-card:hover {
@@ -775,6 +795,7 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .feature-icon-box svg {
@@ -840,6 +861,7 @@ button, input, select, textarea {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
+  width: 100%;
 }
 
 .service-card {
@@ -851,6 +873,7 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease;
+  width: 100%;
 }
 
 .service-card:hover {
@@ -863,6 +886,7 @@ button, input, select, textarea {
   position: relative;
   height: 220px;
   overflow: hidden;
+  width: 100%;
 }
 
 .service-img {
@@ -915,6 +939,7 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .service-icon svg {
@@ -1004,6 +1029,7 @@ button, input, select, textarea {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
+  width: 100%;
 }
 
 .why-card {
@@ -1013,6 +1039,7 @@ button, input, select, textarea {
   border: 1px solid var(--color-border-dark);
   position: relative;
   transition: transform 0.35s, border-color 0.35s;
+  width: 100%;
 }
 
 .why-card:hover {
@@ -1040,6 +1067,7 @@ button, input, select, textarea {
   align-items: center;
   justify-content: center;
   margin-bottom: 1.5rem;
+  flex-shrink: 0;
 }
 
 .why-icon svg {
@@ -1073,6 +1101,7 @@ button, input, select, textarea {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
+  width: 100%;
 }
 
 .gallery-item {
@@ -1081,6 +1110,7 @@ button, input, select, textarea {
   overflow: hidden;
   cursor: pointer;
   outline: none;
+  width: 100%;
 }
 
 .gallery-item-inner {
@@ -1088,6 +1118,7 @@ button, input, select, textarea {
   height: 320px;
   overflow: hidden;
   border-radius: var(--border-radius-md);
+  width: 100%;
 }
 
 .gallery-img {
@@ -1167,6 +1198,7 @@ button, input, select, textarea {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
+  width: 100%;
 }
 
 .testimonial-card {
@@ -1179,6 +1211,7 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   transition: transform 0.35s;
+  width: 100%;
 }
 
 .testimonial-card:hover {
@@ -1230,6 +1263,7 @@ button, input, select, textarea {
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--color-primary);
+  flex-shrink: 0;
 }
 
 .client-name {
@@ -1263,6 +1297,7 @@ button, input, select, textarea {
   border-radius: var(--border-radius-lg);
   border: 1px solid var(--color-border-dark);
   box-shadow: var(--shadow-lg);
+  width: 100%;
 }
 
 .appointment-intro .section-label {
@@ -1301,6 +1336,7 @@ button, input, select, textarea {
   height: 18px;
   stroke: var(--color-primary);
   min-width: 18px;
+  flex-shrink: 0;
 }
 
 .direct-call-box {
@@ -1338,16 +1374,19 @@ button, input, select, textarea {
   border-radius: var(--border-radius-md);
   box-shadow: var(--shadow-md);
   position: relative;
+  width: 100%;
 }
 
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.25rem;
+  width: 100%;
 }
 
 .form-group {
   margin-bottom: 1.25rem;
+  width: 100%;
 }
 
 .form-label {
@@ -1397,6 +1436,7 @@ button, input, select, textarea {
 
 .select-wrapper {
   position: relative;
+  width: 100%;
 }
 
 .form-select {
@@ -1484,6 +1524,7 @@ button, input, select, textarea {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 3rem;
+  width: 100%;
 }
 
 .contact-info-card {
@@ -1491,6 +1532,7 @@ button, input, select, textarea {
   padding: 3rem 2.5rem;
   border-radius: var(--border-radius-lg);
   border: 1px solid var(--color-border);
+  width: 100%;
 }
 
 .contact-brand-title {
@@ -1535,6 +1577,7 @@ button, input, select, textarea {
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--color-border);
   min-width: 42px;
+  flex-shrink: 0;
 }
 
 .contact-icon svg {
@@ -1593,6 +1636,7 @@ button, input, select, textarea {
   justify-content: center;
   border: 1px solid var(--color-border);
   transition: var(--transition-standard);
+  flex-shrink: 0;
 }
 
 .social-btn svg {
@@ -1611,6 +1655,7 @@ button, input, select, textarea {
 .contact-map-wrapper {
   height: 100%;
   min-height: 420px;
+  width: 100%;
 }
 
 .map-container {
@@ -1648,6 +1693,7 @@ button, input, select, textarea {
   background-color: var(--color-primary);
   box-shadow: 0 0 0 0 rgba(197, 168, 128, 0.7);
   animation: pulsePin 1.8s infinite;
+  flex-shrink: 0;
 }
 
 @keyframes pulsePin {
@@ -1673,6 +1719,7 @@ button, input, select, textarea {
   display: grid;
   grid-template-columns: 1.5fr 1fr 1.2fr 1.3fr;
   gap: 3rem;
+  width: 100%;
 }
 
 .footer-logo {
@@ -1705,6 +1752,7 @@ button, input, select, textarea {
   align-items: center;
   justify-content: center;
   transition: var(--transition-standard);
+  flex-shrink: 0;
 }
 
 .f-social-link svg {
@@ -1827,6 +1875,7 @@ button, input, select, textarea {
   padding: 2rem;
   opacity: 0;
   transition: opacity 0.3s ease;
+  box-sizing: border-box;
 }
 
 .lightbox-modal.active {
@@ -1993,7 +2042,7 @@ button, input, select, textarea {
   }
 }
 
-/* 768px & Below: Tablets Portrait & Large Mobile */
+/* 768px & Below: Tablets Portrait & Mobile (Exact Requirements Addressed) */
 @media (max-width: 768px) {
   .top-bar {
     display: none; /* Clean mobile header */
@@ -2003,20 +2052,22 @@ button, input, select, textarea {
     height: 70px;
   }
 
-  /* Mobile Navigation Drawer */
+  /* Mobile Hamburger Toggle */
   .mobile-toggle {
     display: flex;
   }
 
   .btn-nav {
-    display: none; /* Retained inside drawer or hero */
+    display: none;
   }
 
-  .nav-menu {
+  /* Mobile Navigation Menu Drawer: Hidden off-screen by default */
+  .nav-menu,
+  .nav-links {
     position: fixed;
     top: 0;
     right: -100%;
-    width: 80%;
+    width: 75%;
     max-width: 340px;
     height: 100vh;
     background-color: #FFFFFF;
@@ -2024,13 +2075,23 @@ button, input, select, textarea {
     flex-direction: column;
     align-items: flex-start;
     padding: 5.5rem 2rem 2.5rem;
-    transition: right 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: right 0.35s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.35s ease;
     z-index: 1005;
     overflow-y: auto;
+    visibility: hidden;
+    pointer-events: none;
+    display: flex;
+    box-sizing: border-box;
   }
 
-  .nav-menu.open {
+  /* Slides into view only when hamburger clicked and .active / .open is added */
+  .nav-menu.active,
+  .nav-menu.open,
+  .nav-links.active,
+  .nav-links.open {
     right: 0;
+    visibility: visible;
+    pointer-events: auto;
   }
 
   .nav-overlay {
@@ -2064,37 +2125,158 @@ button, input, select, textarea {
     width: 100%;
   }
 
-  /* Hero Adjustments */
+  /* HERO SECTION CENTERING (Strictly centered on mobile screens) */
+  .hero-section {
+    padding: 3rem 0 3.5rem;
+    overflow-x: hidden;
+    width: 100%;
+  }
+
   .hero-container {
     grid-template-columns: 1fr;
-    gap: 3rem;
+    gap: 2.5rem;
+    width: 100%;
+    margin: 0 auto;
+    padding-left: var(--container-padding);
+    padding-right: var(--container-padding);
+    box-sizing: border-box;
   }
 
   .hero-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    box-sizing: border-box;
   }
 
   .eyebrow-tag {
+    display: inline-flex;
     justify-content: center;
+    align-items: center;
+    margin: 0 auto 0.75rem auto;
+    text-align: center;
+  }
+
+  .hero-subtitle {
+    text-align: center;
+    width: 100%;
+    margin: 0 auto 0.5rem auto;
+  }
+
+  .hero-title {
+    text-align: center;
+    width: 100%;
+    margin: 0 auto 1.25rem auto;
   }
 
   .hero-description {
-    margin-left: auto;
-    margin-right: auto;
+    text-align: center;
+    margin: 0 auto 2rem auto;
+    max-width: 540px;
+    width: 100%;
   }
 
   .hero-buttons {
+    display: flex;
     justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    width: 100%;
+    margin: 0 auto 2.25rem auto;
   }
 
   .hero-badges {
+    display: flex;
     justify-content: center;
+    align-items: center;
     flex-wrap: wrap;
+    gap: 1.25rem;
+    width: 100%;
+    margin: 0 auto;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .badge-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .hero-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+
+  .hero-image-frame {
+    margin: 0 auto;
+    width: 100%;
+    max-width: 440px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    box-sizing: border-box;
+  }
+
+  .hero-img {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 420px;
+    object-fit: cover;
+    margin: 0 auto;
+    display: block;
+    box-sizing: border-box;
   }
 
   .hero-floating-card {
-    left: 12px;
-    bottom: -16px;
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    top: auto;
+    margin: 1.25rem auto 0 auto;
+    width: fit-content;
+    max-width: 90%;
+    box-sizing: border-box;
+    text-align: left;
+  }
+
+  /* About Section Centering on Mobile */
+  .about-container {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .about-image-wrapper {
+    display: flex;
+    justify-content: center;
+  }
+
+  .about-img-frame {
+    max-width: 440px;
+    margin: 0 auto;
+  }
+
+  .about-features-grid {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+
+  .about-actions {
+    justify-content: center;
   }
 
   /* Gallery to 2 Columns */
@@ -2111,10 +2293,6 @@ button, input, select, textarea {
     grid-template-columns: 1fr;
   }
 
-  .about-features-grid {
-    grid-template-columns: 1fr;
-  }
-
   .form-row {
     grid-template-columns: 1fr;
   }
@@ -2127,29 +2305,31 @@ button, input, select, textarea {
   }
 
   .hero-title {
-    font-size: 2.25rem;
+    font-size: 2.15rem;
+    text-align: center;
+  }
+
+  .hero-description {
+    text-align: center;
   }
 
   .hero-buttons {
     flex-direction: column;
     width: 100%;
+    align-items: center;
   }
 
   .hero-buttons .btn {
     width: 100%;
+    max-width: 320px;
   }
 
   .hero-img {
-    height: 340px;
-  }
-
-  .hero-floating-card {
-    position: static;
-    margin-top: 1rem;
+    height: 320px;
   }
 
   .about-img {
-    height: 320px;
+    height: 300px;
   }
 
   .experience-badge {
@@ -2204,7 +2384,8 @@ button, input, select, textarea {
   }
 
   .hero-title {
-    font-size: 1.95rem;
+    font-size: 1.85rem;
+    text-align: center;
   }
 
   .btn {
