@@ -2304,45 +2304,102 @@ button, input, select, textarea {
     text-align: left;
   }
 
-  /* About Section Centering on Mobile */
-  .about-container {
-    grid-template-columns: 1fr;
-    text-align: center;
+  /* ── About Section — Comprehensive Mobile Fix ──────────────────────────── */
+
+  /* Section wrapper: guarantee it never exceeds the viewport */
+  .about-section {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
   }
 
+  /* Container: 15px gutter on both sides, full width */
+  .about-container {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+    box-sizing: border-box !important;
+    text-align: center;
+    overflow-x: hidden !important;
+  }
+
+  /* Content column: same gutter, no chance of escaping the viewport */
+  .about-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Image wrapper */
   .about-image-wrapper {
     display: flex;
     justify-content: center;
-    width: 100%;
-    max-width: 100%;
-    overflow: hidden;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
   }
 
+  /* Image frame: clips the badge so it can never escape */
   .about-img-frame {
-    width: 100%;
-    max-width: 440px;
+    position: relative;
+    width: 100% !important;
+    max-width: 100% !important;
     margin: 0 auto;
-    overflow: hidden;   /* clip the badge so it can never escape the frame */
-    box-sizing: border-box;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
   }
 
-  /* Keep badge visible but constrained inside the frame */
+  /* Experience badge: stay inside the frame, right-aligned with safe margin */
   .experience-badge {
-    position: absolute;
-    bottom: 12px;
-    right: 12px;
-    max-width: calc(100% - 24px);   /* never wider than the frame */
-    box-sizing: border-box;
+    position: absolute !important;
+    bottom: 10px !important;
+    right: 10px !important;
+    max-width: 80% !important;
+    box-sizing: border-box !important;
   }
 
+  /* Feature cards grid: single column, cards can't overflow */
   .about-features-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
     text-align: left;
   }
 
-  .about-actions {
-    justify-content: center;
+  /* Each feature card: no min-width so grid can shrink it freely */
+  .about-feature-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
+
+  /* Action buttons: wrap naturally, centred, no horizontal bleed */
+  .about-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 0.875rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .about-actions .btn {
+    flex-shrink: 0;
+    max-width: 100%;
+  }
+  /* ─────────────────────────────────────────────────────────────────────── */
 
   /* Gallery to 2 Columns */
   .gallery-grid {
