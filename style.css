@@ -2062,6 +2062,38 @@ button, input, select, textarea {
 
 /* 768px & Below: Tablets Portrait & Mobile (Exact Requirements Addressed) */
 @media (max-width: 768px) {
+  /* ── Global overflow containment: nothing may exceed 100vw ─────────────── */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  section,
+  .container,
+  .hero-container,
+  .about-container,
+  .about-image-wrapper,
+  .about-img-frame,
+  .hero-visual,
+  .hero-image-frame,
+  .gallery-grid,
+  .services-grid,
+  .why-us-grid,
+  .testimonials-grid,
+  .appointment-card-wrapper,
+  .contact-grid,
+  .footer-grid {
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  /* ─────────────────────────────────────────────────────────────────────── */
+
   .top-bar {
     display: none; /* Clean mobile header */
   }
@@ -2281,11 +2313,26 @@ button, input, select, textarea {
   .about-image-wrapper {
     display: flex;
     justify-content: center;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .about-img-frame {
+    width: 100%;
     max-width: 440px;
     margin: 0 auto;
+    overflow: hidden;   /* clip the badge so it can never escape the frame */
+    box-sizing: border-box;
+  }
+
+  /* Keep badge visible but constrained inside the frame */
+  .experience-badge {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    max-width: calc(100% - 24px);   /* never wider than the frame */
+    box-sizing: border-box;
   }
 
   .about-features-grid {
@@ -2318,6 +2365,16 @@ button, input, select, textarea {
 
 /* 480px & Below: Mobile Devices */
 @media (max-width: 480px) {
+  html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
   :root {
     --container-padding: 1.125rem;
   }
