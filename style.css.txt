@@ -1464,6 +1464,24 @@ button, input, select, textarea {
   min-height: 80px;
 }
 
+/* Appointment Form Submit Button — Proportional Sizing Override */
+#btnSubmitAppointment,
+.appointment-form .btn-block {
+  width: 100%;
+  padding: 14px 28px;
+  font-size: 1rem;        /* 16px */
+  border-radius: 25px;    /* clean rounded, not full pill */
+  gap: 10px;
+  justify-content: center;
+}
+
+#btnSubmitAppointment svg,
+.appointment-form .btn-block svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
 /* Form Success Feedback State */
 .form-feedback {
   display: none;
