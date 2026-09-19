@@ -136,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const inputName = document.getElementById('fullName');
   const inputPhone = document.getElementById('phoneNumber');
-  const inputEmail = document.getElementById('email');
   const selectService = document.getElementById('serviceSelect');
   const inputDate = document.getElementById('preferredDate');
   const selectTime = document.getElementById('preferredTime');
@@ -144,7 +143,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const errorName = document.getElementById('nameError');
   const errorPhone = document.getElementById('phoneError');
-  const errorEmail = document.getElementById('emailError');
   const errorService = document.getElementById('serviceError');
   const errorDate = document.getElementById('dateError');
 
@@ -177,16 +175,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const isValidName = val => val.length >= 2;
-  const isValidPhone = val => {
-    // Allows standard phone formats (e.g. 077 123 4567, +94 77 123 4567, 0771234567)
-    const phoneRegex = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
-    return val.length >= 9 && phoneRegex.test(val.replace(/\s+/g, ''));
-  };
-  const isValidEmail = val => {
-    if (!val) return true; // Optional field, but validate if provided
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(val);
-  };
+  // Strict 10-digit validation: exactly 10 numeric digits (0-9)
+  const isValidPhone = val => /^[0-9]{10}$/.test(val);
   const isValidService = val => val !== '';
   const isValidDate = val => {
     if (!val) return false;
@@ -196,9 +186,15 @@ document.addEventListener('DOMContentLoaded', () => {
     return selectedDate >= today;
   };
 
+  // Real-time phone number sanitization: only allow digits (0-9) and cap at 10 digits
+  if (inputPhone) {
+    inputPhone.addEventListener('input', () => {
+      inputPhone.value = inputPhone.value.replace(/\D/g, '').slice(0, 10);
+    });
+  }
+
   setupInputValidation(inputName, errorName, isValidName);
   setupInputValidation(inputPhone, errorPhone, isValidPhone);
-  setupInputValidation(inputEmail, errorEmail, isValidEmail);
   setupInputValidation(selectService, errorService, isValidService);
   setupInputValidation(inputDate, errorDate, isValidDate);
 
@@ -224,24 +220,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const phoneVal = inputPhone.value.trim();
       if (!isValidPhone(phoneVal)) {
         inputPhone.classList.add('is-invalid');
-        errorPhone.textContent = phoneVal.length === 0 ? 'Phone number cannot be empty.' : 'Please enter a valid phone number (e.g. 077 123 4567).';
+        errorPhone.textContent = phoneVal.length === 0 
+          ? 'Phone number cannot be empty.' 
+          : 'Please enter a valid 10-digit phone number (e.g. 0771234567).';
         errorPhone.classList.add('visible');
         isValid = false;
       } else {
         inputPhone.classList.remove('is-invalid');
         errorPhone.classList.remove('visible');
-      }
-
-      // Validate Email (Optional but must be valid format if entered)
-      const emailVal = inputEmail.value.trim();
-      if (!isValidEmail(emailVal)) {
-        inputEmail.classList.add('is-invalid');
-        errorEmail.textContent = 'Please enter a valid email address.';
-        errorEmail.classList.add('visible');
-        isValid = false;
-      } else {
-        inputEmail.classList.remove('is-invalid');
-        errorEmail.classList.remove('visible');
       }
 
       // Validate Service
@@ -274,7 +260,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const bookingData = {
           name: nameVal,
           phone: phoneVal,
-          email: emailVal || 'Not provided',
           service: serviceVal,
           date: dateVal,
           time: selectTime.value || 'Flexible',

@@ -702,45 +702,36 @@
 
             <form id="appointmentForm" class="appointment-form" novalidate>
               <div class="form-row">
-                <!-- Full Name -->
+                <!-- Name -->
                 <div class="form-group">
-                  <label for="fullName" class="form-label">Full Name <span class="required">*</span></label>
+                  <label for="fullName" class="form-label">Name <span class="required">*</span></label>
                   <input type="text" id="fullName" name="fullName" class="form-input" placeholder="e.g. Sarah Jenkins" autocomplete="name">
-                  <span class="form-error" id="nameError">Please enter your full name.</span>
+                  <span class="form-error" id="nameError">Please enter your name.</span>
                 </div>
 
                 <!-- Phone Number -->
                 <div class="form-group">
                   <label for="phoneNumber" class="form-label">Phone Number <span class="required">*</span></label>
-                  <input type="tel" id="phoneNumber" name="phoneNumber" class="form-input" placeholder="e.g. 077 123 4567" autocomplete="tel">
+                  <input type="tel" id="phoneNumber" name="phoneNumber" class="form-input" placeholder="e.g. 0771234567" autocomplete="tel" maxlength="10" pattern="[0-9]{10}" inputmode="numeric">
                   <span class="form-error" id="phoneError">Please enter a valid phone number.</span>
                 </div>
               </div>
 
-              <div class="form-row">
-                <!-- Email -->
-                <div class="form-group">
-                  <label for="email" class="form-label">Email Address</label>
-                  <input type="email" id="email" name="email" class="form-input" placeholder="e.g. sarah@example.com" autocomplete="email">
-                  <span class="form-error" id="emailError">Please enter a valid email address.</span>
+              <!-- Service (Dropdown without price tags) -->
+              <div class="form-group">
+                <label for="serviceSelect" class="form-label">Service <span class="required">*</span></label>
+                <div class="select-wrapper">
+                  <select id="serviceSelect" name="service" class="form-input form-select">
+                    <option value="">Choose a Service</option>
+                    <option value="Hair Cut">Hair Cut (Rs. 2,000)</option>
+                    <option value="Hair Coloring">Hair Coloring (Rs. 6,500)</option>
+                    <option value="Hair Styling">Hair Styling (Rs. 3,000)</option>
+                    <option value="Hair Treatment">Hair Treatment (Rs. 4,500)</option>
+                    <option value="Bridal Styling">Bridal Styling (Rs. 15,000)</option>
+                    <option value="Facial & Beauty Care">Facial & Beauty Care (Rs. 4,000)</option>
+                  </select>
                 </div>
-
-                <!-- Service (Dropdown with at least 6 services) -->
-                <div class="form-group">
-                  <label for="serviceSelect" class="form-label">Service <span class="required">*</span></label>
-                  <div class="select-wrapper">
-                    <select id="serviceSelect" name="service" class="form-input form-select">
-                      <option value="">-- Choose a Service --</option>
-                      <option value="Hair Cut">Hair Cut (Rs. 2,000)</option>
-                      <option value="Hair Coloring">Hair Coloring (Rs. 6,500)</option>
-                      <option value="Hair Styling">Hair Styling (Rs. 3,000)</option>
-                      <option value="Hair Treatment">Hair Treatment (Rs. 4,500)</option>
-                      <option value="Bridal Styling">Bridal Styling (Rs. 15,000)</option>
-                      <option value="Facial & Beauty Care">Facial & Beauty Care (Rs. 4,000)</option>
-                    </select>
-                  </div>
-                  <span class="form-error" id="serviceError">Please select a service.</span>
-                </div>
+                <span class="form-error" id="serviceError">Please select a service.</span>
               </div>
 
               <div class="form-row">
@@ -756,13 +747,25 @@
                   <label for="preferredTime" class="form-label">Preferred Time</label>
                   <div class="select-wrapper">
                     <select id="preferredTime" name="preferredTime" class="form-input form-select">
-                      <option value="">-- Choose Preferred Time --</option>
-                      <option value="09:00 AM">09:00 AM – 10:30 AM</option>
-                      <option value="11:00 AM">11:00 AM – 12:30 PM</option>
-                      <option value="01:30 PM">01:30 PM – 03:00 PM</option>
-                      <option value="03:30 PM">03:30 PM – 05:00 PM</option>
-                      <option value="05:30 PM">05:30 PM – 07:00 PM</option>
-                      <option value="07:00 PM">07:00 PM – 08:00 PM</option>
+                      <option value=""sisablednsekected >Select Time</option>
+                      <optgroup label="Morning Slots (9:00 AM – 12:00 PM)">
+                        <option value="09:00 AM - 09:45 AM">9:00 AM - 9:45 AM</option>
+                        <option value="09:45 AM - 10:30 AM">9:45 AM - 10:30 AM</option>
+                        <option value="10:30 AM - 11:15 AM">10:30 AM - 11:15 AM</option>
+                        <option value="11:15 AM - 12:00 PM">11:15 AM - 12:00 PM</option>
+                      </optgroup>
+                      <optgroup label="Evening Slots (12:45 PM – 8:00 PM)">
+                        <option value="12:45 PM - 01:30 PM">12:45 PM - 1:30 PM</option>
+                        <option value="01:30 PM - 02:15 PM">1:30 PM - 2:15 PM</option>
+                        <option value="02:15 PM - 03:00 PM">2:15 PM - 3:00 PM</option>
+                        <option value="03:00 PM - 03:45 PM">3:00 PM - 3:45 PM</option>
+                        <option value="03:45 PM - 04:30 PM">3:45 PM - 4:30 PM</option>
+                        <option value="04:30 PM - 05:15 PM">4:30 PM - 5:15 PM</option>
+                        <option value="05:15 PM - 06:00 PM">5:15 PM - 6:00 PM</option>
+                        <option value="06:00 PM - 06:45 PM">6:00 PM - 6:45 PM</option>
+                        <option value="06:45 PM - 07:30 PM">6:45 PM - 7:30 PM</option>
+                        <option value="07:15 PM - 08:00 PM">7:15 PM - 8:00 PM</option>
+                      </optgroup>
                     </select>
                   </div>
                 </div>
@@ -955,12 +958,12 @@
         <div class="footer-col">
           <h4 class="footer-title">Our Services</h4>
           <ul class="footer-nav">
-            <li><a href="#services">Hair Cut (Rs. 2,000)</a></li>
-            <li><a href="#services">Hair Coloring (Rs. 6,500)</a></li>
-            <li><a href="#services">Hair Styling (Rs. 3,000)</a></li>
-            <li><a href="#services">Hair Treatment (Rs. 4,500)</a></li>
-            <li><a href="#services">Bridal Styling (Rs. 15,000)</a></li>
-            <li><a href="#services">Facial & Beauty Care (Rs. 4,000)</a></li>
+            <li><a href="#services">Hair Cut </a></li>
+            <li><a href="#services">Hair Coloring </a></li>
+            <li><a href="#services">Hair Styling </a></li>
+            <li><a href="#services">Hair Treatment </a></li>
+            <li><a href="#services">Bridal Styling </a></li>
+            <li><a href="#services">Facial & Beauty Care </a></li>
           </ul>
         </div>
 
