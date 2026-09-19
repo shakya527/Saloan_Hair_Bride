@@ -83,6 +83,11 @@
 
       <!-- CTA Button & Mobile Hamburger Toggle -->
       <div class="header-actions">
+        <button type="button" class="btn btn-secondary btn-nav-admin" id="btnNavAdminOpen" title="Open Salon Admin Panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;display:inline-block;vertical-align:-2px;margin-right:4px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span>Admin</span>
+          <span class="nav-admin-badge" id="navAdminBadge" style="display:none;">0</span>
+        </button>
         <a href="#appointment" class="btn btn-primary btn-nav">Book Appointment</a>
         <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle Navigation Menu" aria-expanded="false" aria-controls="navMenu">
           <span class="bar"></span>
@@ -688,16 +693,64 @@
 
           <!-- Appointment Booking Form (Strictly Following Requirements) -->
           <div class="appointment-form-box">
-            <!-- Dynamic Success Feedback Message -->
+            <!-- Dynamic Success Feedback Message with Live Status Tracker -->
             <div class="form-feedback" id="formSuccessMessage" role="alert" aria-live="polite">
-              <div class="feedback-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <div class="feedback-icon" id="feedbackIcon">
+                <svg class="icon-pending" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <svg class="icon-confirmed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
               </div>
-              <h3 class="feedback-title">Appointment request submitted successfully!</h3>
+              
+              <div class="feedback-status-pill status-pending" id="feedbackStatusBadge">
+                <span class="pulse-dot"></span>
+                <span id="feedbackStatusText">Awaiting Salon Confirmation</span>
+              </div>
+
+              <h3 class="feedback-title" id="feedbackTitle">Your booking request has been sent!</h3>
               <p class="feedback-desc" id="feedbackDetails">
-                Thank you, <span id="feedbackClientName">Client</span>. We have reserved your appointment and our team will contact you shortly to confirm.
+                Thank you, <span id="feedbackClientName">Client</span>. We have captured your request and our salon team is reviewing it in real time.
               </p>
-              <button type="button" class="btn btn-secondary btn-sm" id="btnResetForm">Book Another Appointment</button>
+
+              <!-- Live Customer Appointment Summary Card -->
+              <div class="customer-booking-summary" id="customerBookingSummary">
+                <div class="summary-header">
+                  <span class="summary-id" id="summaryBookingId">#APT-XXXXX</span>
+                  <span class="summary-time" id="summaryCreatedAt">Just now</span>
+                </div>
+                <div class="summary-grid">
+                  <div class="summary-item">
+                    <span class="summary-label">Service</span>
+                    <strong class="summary-val" id="summaryService">-</strong>
+                  </div>
+                  <div class="summary-item">
+                    <span class="summary-label">Date & Time</span>
+                    <strong class="summary-val" id="summaryDateTime">-</strong>
+                  </div>
+                  <div class="summary-item">
+                    <span class="summary-label">Contact Phone</span>
+                    <strong class="summary-val" id="summaryPhone">-</strong>
+                  </div>
+                  <div class="summary-item">
+                    <span class="summary-label">Special Requests</span>
+                    <strong class="summary-val" id="summaryRequests">None</strong>
+                  </div>
+                </div>
+
+                <!-- Live Salon Admin Note Box -->
+                <div class="salon-note-container" id="salonNoteContainer">
+                  <div class="salon-note-header">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span>Message from Salon</span>
+                  </div>
+                  <p class="salon-note-body" id="salonNoteBody">
+                    Awaiting salon staff confirmation...
+                  </p>
+                </div>
+              </div>
+
+              <div class="feedback-actions">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnResetForm">Book Another Appointment</button>
+                <button type="button" class="btn btn-primary btn-sm btn-admin-shortcut" id="btnOpenAdminFromCustomer">Open Admin View</button>
+              </div>
             </div>
 
             <form id="appointmentForm" class="appointment-form" novalidate>
@@ -722,11 +775,11 @@
                 <label for="serviceSelect" class="form-label">Service <span class="required">*</span></label>
                 <div class="select-wrapper">
                   <select id="serviceSelect" name="service" class="form-input form-select">
-                    <option value="">Choose a Service</option>
+                    <option value="">Choose a Service </option>
                     <option value="Hair Cut">Hair Cut (Rs. 2,000)</option>
                     <option value="Hair Coloring">Hair Coloring (Rs. 6,500)</option>
                     <option value="Hair Styling">Hair Styling (Rs. 3,000)</option>
-                    <option value="Hair Treatment">Hair Treatment (Rs. 4,500)</option>
+                    <option value="Hair Treatment">Hair Treatment  (Rs. 4,500)</option>
                     <option value="Bridal Styling">Bridal Styling (Rs. 15,000)</option>
                     <option value="Facial & Beauty Care">Facial & Beauty Care (Rs. 4,000)</option>
                   </select>
@@ -747,7 +800,7 @@
                   <label for="preferredTime" class="form-label">Preferred Time</label>
                   <div class="select-wrapper">
                     <select id="preferredTime" name="preferredTime" class="form-input form-select">
-                      <option value=""sisablednsekected >Select Time</option>
+                      <option value=""disabled selected >Select Time</option>
                       <optgroup label="Morning Slots (9:00 AM – 12:00 PM)">
                         <option value="09:00 AM - 09:45 AM">9:00 AM - 9:45 AM</option>
                         <option value="09:45 AM - 10:30 AM">9:45 AM - 10:30 AM</option>
@@ -1020,6 +1073,92 @@
   <button class="scroll-top-btn" id="scrollTopBtn" aria-label="Scroll back to top">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
   </button>
+
+  <!-- =========================================================================
+       SALON ADMIN LIVE NOTIFICATION & CONFIRMATION PANEL
+       ========================================================================= -->
+
+  <!-- Floating Admin Launcher Button -->
+  <button class="admin-launcher-btn" id="adminLauncherBtn" aria-label="Open Salon Admin Panel" title="Open Salon Admin Panel">
+    <div class="admin-launcher-icon-wrap">
+      <svg class="admin-bell-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+      <span class="admin-launcher-badge" id="adminLauncherBadge">0</span>
+    </div>
+    <span class="admin-launcher-text">Salon Admin</span>
+  </button>
+
+  <!-- Admin Live Toast Container -->
+  <div class="admin-toast-container" id="adminToastContainer" aria-live="assertive"></div>
+
+  <!-- Admin Modal Overlay -->
+  <div class="admin-modal-overlay" id="adminModalOverlay" role="dialog" aria-modal="true" aria-labelledby="adminModalTitle" aria-hidden="true">
+    <div class="admin-modal">
+      <!-- Admin Modal Header -->
+      <div class="admin-modal-header">
+        <div class="admin-header-title-wrap">
+          <div class="admin-brand-pill">
+            <span class="live-dot"></span>
+            <span>LIVE DISPATCH</span>
+          </div>
+          <h2 class="admin-modal-title" id="adminModalTitle">Salon Appointments & Confirmation Dashboard</h2>
+        </div>
+        <div class="admin-header-controls">
+          <button type="button" class="btn-admin-icon" id="btnAdminSoundToggle" title="Toggle Alert Sound" aria-label="Toggle Alert Sound">
+            <svg class="icon-sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            <svg class="icon-sound-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+          </button>
+          <button type="button" class="admin-modal-close" id="adminModalClose" aria-label="Close Admin Dashboard">&times;</button>
+        </div>
+      </div>
+
+      <!-- Admin Stats KPI Ribbon -->
+      <div class="admin-kpi-ribbon">
+        <div class="admin-kpi-card" data-kpi="total">
+          <span class="kpi-label">Total Requests</span>
+          <span class="kpi-value" id="kpiTotalRequests">0</span>
+        </div>
+        <div class="admin-kpi-card highlight-pending" data-kpi="pending">
+          <span class="kpi-label">Awaiting Confirmation</span>
+          <span class="kpi-value" id="kpiPendingRequests">0</span>
+        </div>
+        <div class="admin-kpi-card highlight-confirmed" data-kpi="confirmed">
+          <span class="kpi-label">Confirmed Bookings</span>
+          <span class="kpi-value" id="kpiConfirmedRequests">0</span>
+        </div>
+      </div>
+
+      <!-- Admin Filter & Search Toolbar -->
+      <div class="admin-toolbar">
+        <div class="admin-tabs" role="tablist">
+          <button class="admin-tab active" data-filter="all">All (<span id="countTabAll">0</span>)</button>
+          <button class="admin-tab" data-filter="pending">Pending (<span id="countTabPending">0</span>)</button>
+          <button class="admin-tab" data-filter="confirmed">Confirmed (<span id="countTabConfirmed">0</span>)</button>
+          <button class="admin-tab" data-filter="cancelled">Cancelled (<span id="countTabCancelled">0</span>)</button>
+        </div>
+        <div class="admin-search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="adminSearchInput" placeholder="Search by client, phone or service..." autocomplete="off">
+        </div>
+        <div class="admin-toolbar-actions">
+          <button type="button" class="btn-admin-action" id="btnAdminSeedSample" title="Add Sample Customer Booking">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Demo Test Request</span>
+          </button>
+          <button type="button" class="btn-admin-action btn-danger-ghost" id="btnAdminClearAll" title="Clear All Appointments">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Admin Appointments Stream List -->
+      <div class="admin-appointments-container" id="adminAppointmentsList">
+        <!-- Rendered dynamically by JavaScript -->
+      </div>
+    </div>
+  </div>
 
   <!-- Main JavaScript File -->
   <script src="script.js"></script>
