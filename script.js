@@ -136,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const inputName = document.getElementById('fullName');
   const inputPhone = document.getElementById('phoneNumber');
+  const inputEmail = document.getElementById('email');
   const selectService = document.getElementById('serviceSelect');
   const inputDate = document.getElementById('preferredDate');
   const selectTime = document.getElementById('preferredTime');
@@ -143,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const errorName = document.getElementById('nameError');
   const errorPhone = document.getElementById('phoneError');
+  const errorEmail = document.getElementById('emailError');
   const errorService = document.getElementById('serviceError');
   const errorDate = document.getElementById('dateError');
 
@@ -177,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const isValidName = val => val.length >= 2;
   // Strict 10-digit validation: exactly 10 numeric digits (0-9)
   const isValidPhone = val => /^[0-9]{10}$/.test(val);
+  const isValidEmail = val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
   const isValidService = val => val !== '';
   const isValidDate = val => {
     if (!val) return false;
@@ -195,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   setupInputValidation(inputName, errorName, isValidName);
   setupInputValidation(inputPhone, errorPhone, isValidPhone);
+  setupInputValidation(inputEmail, errorEmail, isValidEmail);
   setupInputValidation(selectService, errorService, isValidService);
   setupInputValidation(inputDate, errorDate, isValidDate);
 
@@ -230,6 +234,20 @@ document.addEventListener('DOMContentLoaded', () => {
         errorPhone.classList.remove('visible');
       }
 
+      // Validate Email (Required for automated EmailJS confirmation notifications)
+      const emailVal = inputEmail ? inputEmail.value.trim() : '';
+      if (!isValidEmail(emailVal)) {
+        if (inputEmail) inputEmail.classList.add('is-invalid');
+        if (errorEmail) {
+          errorEmail.textContent = emailVal.length === 0 ? 'Email address is required for confirmation.' : 'Please enter a valid email address.';
+          errorEmail.classList.add('visible');
+        }
+        isValid = false;
+      } else {
+        if (inputEmail) inputEmail.classList.remove('is-invalid');
+        if (errorEmail) errorEmail.classList.remove('visible');
+      }
+
       // Validate Service
       const serviceVal = selectService.value;
       if (!isValidService(serviceVal)) {
@@ -259,6 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const appointmentData = {
           name: nameVal,
           phone: phoneVal,
+          email: emailVal,
           service: serviceVal,
           date: dateVal,
           time: (selectTime && selectTime.value) ? selectTime.value : '09:00 AM - 09:45 AM',
@@ -497,6 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: 'APT-98241',
             name: 'Amara Perera',
             phone: '0771234567',
+            email: 'amara.perera@example.com',
             service: 'Bridal Styling',
             date: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
             time: '09:00 AM - 09:45 AM',
@@ -510,6 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: 'APT-84192',
             name: 'David Fernando',
             phone: '0719876543',
+            email: 'david.fernando@example.com',
             service: 'Hair Cut',
             date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
             time: '01:30 PM - 02:15 PM',
@@ -633,6 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
       id: 'APT-' + Math.floor(10000 + Math.random() * 90000),
       name: data.name,
       phone: data.phone,
+      email: data.email || 'customer@example.com',
       service: data.service,
       date: data.date,
       time: data.time,
@@ -682,6 +704,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (summaryService) summaryService.textContent = apt.service;
     if (summaryDateTime) summaryDateTime.textContent = `${apt.date} • ${apt.time}`;
     if (summaryPhone) summaryPhone.textContent = apt.phone;
+    const summaryEmail = document.getElementById('summaryEmail');
+    if (summaryEmail) summaryEmail.textContent = apt.email || 'customer@example.com';
     if (summaryRequests) summaryRequests.textContent = apt.message || 'None';
 
     if (apt.status === 'confirmed') {
@@ -864,6 +888,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                 <span>${escapeHtml(apt.phone)}</span>
               </a>
+              ${apt.email ? `<a href="mailto:${escapeHtml(apt.email)}" class="booking-phone-link" style="margin-top:4px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <span>${escapeHtml(apt.email)}</span>
+              </a>` : ''}
             </div>
 
             <div class="booking-field-group">
@@ -1009,6 +1037,40 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/'/g, '&#039;');
   }
 
+  // -----------------------------------------------------------------------
+  // EmailJS – Send Confirmation / Status Update Email to Customer
+  // Credentials: Service ID: service_835kk9j | Template ID: template_zm5jy8q
+  // -----------------------------------------------------------------------
+  function sendConfirmationEmail(apt) {
+    if (typeof emailjs === 'undefined') {
+      console.warn('EmailJS is not loaded. Skipping email send.');
+      return;
+    }
+    if (!apt || !apt.email) {
+      console.warn('No recipient email on appointment. Skipping email send.');
+      return;
+    }
+
+    const templateParams = {
+      customer_name : apt.name    || 'Valued Customer',
+      booking_date  : apt.date    || 'N/A',
+      time_slot     : apt.time    || 'N/A',
+      status        : apt.status  ? (apt.status.charAt(0).toUpperCase() + apt.status.slice(1)) : 'Updated',
+      admin_note    : apt.adminNote || 'No additional notes.',
+      email         : apt.email
+    };
+
+    emailjs.send('service_835kk9j', 'template_zm5jy8q', templateParams)
+      .then(() => {
+        console.log(`[EmailJS] Confirmation email sent to ${apt.email} (Booking #${apt.id}, Status: ${apt.status})`);
+        showAdminToast('Email Sent ✓', `Confirmation email delivered to <strong>${apt.email}</strong>.`);
+      })
+      .catch((err) => {
+        console.error('[EmailJS] Failed to send email:', err);
+        showAdminToast('Email Error', 'Could not send confirmation email. Check console for details.');
+      });
+  }
+
   function updateAppointmentStatus(id, newStatus, note) {
     const list = getStoredAppointments();
     const apt = list.find(item => item.id === id);
@@ -1022,6 +1084,9 @@ document.addEventListener('DOMContentLoaded', () => {
       updateAdminBadges();
       renderAdminDashboard();
       syncActiveCustomerBooking();
+
+      // Trigger EmailJS confirmation / status-update email to customer
+      sendConfirmationEmail(apt);
     }
   }
 
@@ -1104,6 +1169,7 @@ document.addEventListener('DOMContentLoaded', () => {
       createNewAppointment({
         name: randomName,
         phone: randomPhone,
+        email: randomName.toLowerCase().replace(/\s+/g, '.') + '@demo.lk',
         service: randomService,
         date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
         time: randomSlot,
