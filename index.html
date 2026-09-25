@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -83,11 +83,10 @@
 
       <!-- CTA Button & Mobile Hamburger Toggle -->
       <div class="header-actions">
-        <button type="button" class="btn btn-secondary btn-nav-admin" id="btnNavAdminOpen" title="Open Salon Admin Panel">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;display:inline-block;vertical-align:-2px;margin-right:4px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span>Admin</span>
-          <span class="nav-admin-badge" id="navAdminBadge" style="display:none;">0</span>
-        </button>
+        <button type="button" onclick="sendFormDirectToWhatsApp()" class="btn btn-whatsapp-direct">
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984 0 1.762.459 3.48 1.332 5.001l-1.416 5.17 5.291-1.388c1.464.798 3.115 1.218 4.78 1.218h.004c5.507 0 9.99-4.478 9.99-9.984 0-2.668-1.039-5.176-2.927-7.065C17.188 3.039 14.68 2 12.012 2zm5.836 14.28c-.244.688-1.231 1.258-1.693 1.316-.462.058-1.066.21-3.666-.826-2.222-.886-3.66-3.14-3.771-3.288-.112-.148-.902-1.2-1.002-2.316-.1-1.116.48-1.664.721-1.91.241-.246.525-.308.7-.308.175 0 .35.001.503.008.162.008.38-.061.595.454.22.525.751 1.834.817 1.968.066.134.11.291.022.468-.088.177-.132.287-.263.441-.131.154-.277.344-.395.462-.132.132-.27.276-.116.541.154.265.684 1.129 1.468 1.826 1.008.897 1.858 1.176 2.123 1.308.265.132.42.11.575-.066.155-.176.663-.772.84-1.037.176-.265.352-.22.595-.132.243.088 1.543.728 1.808.86.265.132.441.198.507.308.066.11.066.638-.178 1.326z"/></svg>
+  <span>Book via WhatsApp</span>
+</button>
         <a href="#appointment" class="btn btn-primary btn-nav">Book Appointment</a>
         <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle Navigation Menu" aria-expanded="false" aria-controls="navMenu">
           <span class="bar"></span>
@@ -281,7 +280,7 @@
           <!-- Service 2: Hair Coloring -->
           <article class="service-card" data-category="treatment">
             <div class="service-img-wrapper">
-              <img src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800" alt="Professional hair coloring service at Salon Hair Bird, Colombo" class="service-img" loading="lazy">
+              <img src="https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=800" alt="Professional hair coloring service at Salon Hair Bird, Colombo" class="service-img" loading="lazy">
               <span class="service-tag">Master Colorist</span>
             </div>
             <div class="service-card-body">
@@ -307,7 +306,7 @@
           <!-- Service 3: Hair Styling -->
           <article class="service-card" data-category="hair">
             <div class="service-img-wrapper">
-              <img src="https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=800" alt="Elegant hair styling for occasions at Salon Hair Bird" class="service-img" loading="lazy">
+              <img src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800" alt="Elegant hair styling for occasions at Salon Hair Bird" class="service-img" loading="lazy">
               <span class="service-tag">Trendsetting</span>
             </div>
             <div class="service-card-body">
@@ -529,7 +528,7 @@
           <!-- 3: Hair styling -->
           <div class="gallery-item" data-src="https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=800" data-title="Hollywood Waves & Volume Blowout" data-category="Hair Styling" tabindex="0" role="button" aria-label="View Hair Styling image: Hollywood Waves & Volume Blowout">
             <div class="gallery-item-inner">
-              <img src="https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=800" alt="Glamorous hair styling and waves at Salon Hair Bird" class="gallery-img" loading="lazy">
+              <img src="https://images.unsplash.com/photo-1562322140-8baeececf3df?w=800" alt="Glamorous hair styling and waves at Salon Hair Bird" class="gallery-img" loading="lazy">
               <div class="gallery-overlay">
                 <span class="gallery-tag">Hair Styling</span>
                 <h4 class="gallery-title">Glamorous Waves</h4>
@@ -658,6 +657,7 @@
       </div>
     </section>
 
+
     <!-- 8. APPOINTMENT SECTION -->
     <section class="appointment-section" id="appointment">
       <div class="container">
@@ -749,6 +749,14 @@
                     Awaiting salon staff confirmation...
                   </p>
                 </div>
+
+                <!-- WhatsApp Direct Confirmation Action -->
+                <div class="whatsapp-summary-action" style="margin-top: 15px; text-align: center;">
+                  <button type="button" onclick="sendSummaryToWhatsApp()" class="btn-whatsapp-summary">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="margin-right: 8px;"><path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984 0 1.762.459 3.48 1.332 5.001l-1.416 5.17 5.291-1.388c1.464.798 3.115 1.218 4.78 1.218h.004c5.507 0 9.99-4.478 9.99-9.984 0-2.668-1.039-5.176-2.927-7.065C17.188 3.039 14.68 2 12.012 2zm5.836 14.28c-.244.688-1.231 1.258-1.693 1.316-.462.058-1.066.21-3.666-.826-2.222-.886-3.66-3.14-3.771-3.288-.112-.148-.902-1.2-1.002-2.316-.1-1.116.48-1.664.721-1.91.241-.246.525-.308.7-.308.175 0 .35.001.503.008.162.008.38-.061.595.454.22.525.751 1.834.817 1.968.066.134.11.291.022.468-.088.177-.132.287-.263.441-.131.154-.277.344-.395.462-.132.132-.27.276-.116.541.154.265.684 1.129 1.468 1.826 1.008.897 1.858 1.176 2.123 1.308.265.132.42.11.575-.066.155-.176.663-.772.84-1.037.176-.265.352-.22.595-.132.243.088 1.543.728 1.808.86.265.132.441.198.507.308.066.11.066.638-.178 1.326z"/></svg>
+                    Send Summary via WhatsApp
+                  </button>
+                </div>
               </div>
 
               <div class="feedback-actions">
@@ -813,7 +821,7 @@
                   <label for="preferredTime" class="form-label">Preferred Time</label>
                   <div class="select-wrapper">
                     <select id="preferredTime" name="preferredTime" class="form-input form-select">
-                      <option value=""disabled selected >Select Time</option>
+                      <option value="" disabled selected>Select Time</option>
                       <optgroup label="Morning Slots (9:00 AM – 12:00 PM)">
                         <option value="09:00 AM - 09:45 AM">9:00 AM - 9:45 AM</option>
                         <option value="09:45 AM - 10:30 AM">9:45 AM - 10:30 AM</option>
@@ -843,16 +851,26 @@
                 <textarea id="bookingMessage" name="message" class="form-input form-textarea" rows="3" placeholder="Tell us about your hair type, desired style, or any specific stylist preference..."></textarea>
               </div>
 
-              <!-- Submit Button -->
-              <button type="submit" class="btn btn-primary btn-block" id="btnSubmitAppointment">
-                <span>Book Appointment</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-              </button>
+              <!-- Action Buttons Row -->
+              <div class="form-actions-row" style="display: flex; gap: 10px; margin-top: 15px;">
+                <!-- Default Submit Button (Email/System) -->
+                <button type="submit" class="btn btn-primary btn-block" id="btnSubmitAppointment" style="flex: 1;">
+                  <span>Book Appointment</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </button>
+
+                <!-- WhatsApp Direct Submit Button -->
+                <button type="button" onclick="sendFormDirectToWhatsApp()" class="btn btn-whatsapp-direct" style="flex: 1;">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984 0 1.762.459 3.48 1.332 5.001l-1.416 5.17 5.291-1.388c1.464.798 3.115 1.218 4.78 1.218h.004c5.507 0 9.99-4.478 9.99-9.984 0-2.668-1.039-5.176-2.927-7.065C17.188 3.039 14.68 2 12.012 2zm5.836 14.28c-.244.688-1.231 1.258-1.693 1.316-.462.058-1.066.21-3.666-.826-2.222-.886-3.66-3.14-3.771-3.288-.112-.148-.902-1.2-1.002-2.316-.1-1.116.48-1.664.721-1.91.241-.246.525-.308.7-.308.175 0 .35.001.503.008.162.008.38-.061.595.454.22.525.751 1.834.817 1.968.066.134.11.291.022.468-.088.177-.132.287-.263.441-.131.154-.277.344-.395.462-.132.132-.27.276-.116.541.154.265.684 1.129 1.468 1.826 1.008.897 1.858 1.176 2.123 1.308.265.132.42.11.575-.066.155-.176.663-.772.84-1.037.176-.265.352-.22.595-.132.243.088 1.543.728 1.808.86.265.132.441.198.507.308.066.11.066.638-.178 1.326z"/></svg>
+                  <span>Book via WhatsApp</span>
+                </button>
+              </div>
             </form>
           </div>
         </div>
       </div>
     </section>
+
 
     <!-- 9. CONTACT SECTION -->
     <section class="contact-section" id="contact">
@@ -1047,7 +1065,7 @@
           </div>
           <div class="footer-contact-item">
             <span class="f-icon">📞</span>
-            <a href="tel:0771234567">077 123 4567</a>
+            <a href="tel:0771234567">077 123 4567</a> 
           </div>
         </div>
       </div>

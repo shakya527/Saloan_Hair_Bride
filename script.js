@@ -1227,3 +1227,96 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('✨ Salon Hair Bird Landing Page initialized successfully.');
   console.log('📍 Colombo, Sri Lanka | Phone: 077 123 4567');
 });
+
+
+
+function sendFormDirectToWhatsApp() {
+    try {
+        let name = document.getElementById("fullName") ? document.getElementById("fullName").value.trim() : "";
+        let phone = document.getElementById("phoneNumber") ? document.getElementById("phoneNumber").value.trim() : "";
+        let service = document.getElementById("serviceSelect") ? document.getElementById("serviceSelect").value : "";
+        let date = document.getElementById("preferredDate") ? document.getElementById("preferredDate").value : "";
+        let time = document.getElementById("preferredTime") ? document.getElementById("preferredTime").value : "";
+        let messageText = document.getElementById("bookingMessage") ? document.getElementById("bookingMessage").value.trim() : "";
+
+        if (!name || !phone || !service || !date) {
+            alert("කරුණාකර Name, Phone Number, Service සහ Preferred Date යන සියලුම විස්තර ඇතුළත් කරන්න.");
+            return;
+        }
+
+        let salonNumber = "94720638733"; 
+
+        let message = "Hello Salon Hair Bride!\n\n" +
+                      "*New Appointment Request*\n" +
+                      "-----------------------------\n" +
+                      "*Name:* " + name + "\n" +
+                      "*Phone:* " + phone + "\n" +
+                      "*Service:* " + service + "\n" +
+                      "*Date:* " + date + "\n" +
+                      "*Time Slot:* " + (time || "Not specified") + "\n" +
+                      "*Notes:* " + (messageText || "None") + "\n\n" +
+                      "Please confirm my booking.";
+
+        let whatsappUrl = "https://wa.me/" + salonNumber + "?text=" + encodeURIComponent(message);
+        window.open(whatsappUrl, "_blank");
+    } catch (error) {
+        console.error("Error in sendFormDirectToWhatsApp:", error);
+    }
+}
+
+// 2. Summary Card Submit via WhatsApp ("Send Summary via WhatsApp" Button එකට)
+function sendSummaryToWhatsApp() {
+    try {
+        let bookingId = "";
+        let bookingEl = document.getElementById("summaryBookingId");
+        if (bookingEl) {
+            bookingId = bookingEl.innerText.replace("Booking ID:", "").trim();
+        }
+
+        let clientName = "";
+        let nameInput = document.getElementById("fullName");
+        if (nameInput && nameInput.value.trim() !== "") {
+            clientName = nameInput.value.trim();
+        } else {
+            let nameEl = document.getElementById("feedbackClientName");
+            if (nameEl) clientName = nameEl.innerText.trim();
+        }
+        if (!clientName || clientName === "Client") clientName = "Shakya";
+
+        let service = "";
+        let serviceEl = document.getElementById("summaryService");
+        if (serviceEl && serviceEl.innerText.trim() !== "-" && serviceEl.innerText.trim() !== "") {
+            service = serviceEl.innerText.trim();
+        } else {
+            let serviceSelect = document.getElementById("serviceSelect");
+            if (serviceSelect) service = serviceSelect.value;
+        }
+
+        let dateVal = document.getElementById("preferredDate") ? document.getElementById("preferredDate").value : "";
+        let timeVal = document.getElementById("preferredTime") ? document.getElementById("preferredTime").value : "";
+
+        let fullDateTime = "";
+        if (dateVal) {
+            fullDateTime = dateVal + (timeVal ? " (" + timeVal + ")" : "");
+        } else {
+            let summaryDateEl = document.getElementById("summaryDateTime");
+            if (summaryDateEl) fullDateTime = summaryDateEl.innerText.trim();
+        }
+
+        let salonNumber = "94720638733"; 
+
+        let message = "Hello Salon Hair Bride!\n\n" +
+                      "*Appointment Request Summary*\n" +
+                      "-----------------------------\n" +
+                      "*Booking ID:* " + bookingId + "\n" +
+                      "*Name:* " + clientName + "\n" +
+                      "*Service:* " + service + "\n" +
+                      "*Date:* " + fullDateTime + "\n\n" +
+                      "Please confirm my booking.";
+
+        let whatsappUrl = "https://wa.me/" + salonNumber + "?text=" + encodeURIComponent(message);
+        window.open(whatsappUrl, "_blank");
+    } catch (error) {
+        console.error("Error in sendSummaryToWhatsApp:", error);
+    }
+}
