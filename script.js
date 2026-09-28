@@ -157,6 +157,46 @@ document.addEventListener('DOMContentLoaded', () => {
     inputDate.min = `${yyyy}-${mm}-${dd}`;
   }
 
+  // Real-time slot availability check: disables already booked time slots for the selected date
+  function updateAvailableSlots() {
+    if (!inputDate || !selectTime) return;
+    const selectedDate = inputDate.value;
+    if (!selectedDate) return;
+
+    const appointments = getStoredAppointments();
+    const bookedTimes = appointments
+      .filter(apt => apt.date === selectedDate && apt.status !== 'cancelled')
+      .map(apt => apt.time);
+
+    const options = selectTime.querySelectorAll('option');
+    options.forEach(opt => {
+      if (!opt.value) return; // Skip placeholder
+      const baseTime = opt.getAttribute('data-base-time') || opt.value;
+      if (!opt.getAttribute('data-base-time')) {
+        opt.setAttribute('data-base-time', baseTime);
+      }
+
+      if (bookedTimes.includes(baseTime)) {
+        opt.disabled = true;
+        opt.textContent = `${baseTime} (Booked / Unavailable)`;
+        opt.style.color = '#999999';
+        opt.style.backgroundColor = '#F5F5F5';
+        if (selectTime.value === baseTime) {
+          selectTime.value = '';
+        }
+      } else {
+        opt.disabled = false;
+        opt.textContent = baseTime;
+        opt.style.color = '';
+        opt.style.backgroundColor = '';
+      }
+    });
+  }
+
+  if (inputDate) {
+    inputDate.addEventListener('change', updateAvailableSlots);
+  }
+
   // Real-time error clearing on user input
   function setupInputValidation(inputElement, errorElement, validationFn) {
     if (!inputElement || !errorElement) return;
@@ -274,7 +314,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // If valid, submit appointment request
       if (isValid) {
+        const loggedInUser = getCurrentUser();
         const appointmentData = {
+          userId: loggedInUser ? loggedInUser.id : null,
           name: nameVal,
           phone: phoneVal,
           email: emailVal,
@@ -293,6 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
           formSuccessMessage.classList.add('show');
           formSuccessMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
+        updateAvailableSlots();
       } else {
         // Focus first invalid element
         const firstInvalid = appointmentForm.querySelector('.is-invalid');
@@ -309,6 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
       appointmentForm.reset();
       formSuccessMessage.classList.remove('show');
       appointmentForm.style.display = 'block';
+      autofillClientBookingForm();
       try {
         sessionStorage.removeItem(ACTIVE_BOOKING_KEY);
       } catch (e) {}
@@ -455,11 +499,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================================================
-  // REAL-TIME ADMIN NOTIFICATION & CONFIRMATION SYSTEM
+  // REAL-TIME AUTHENTICATION, PRIVACY SANCTUARY & ADMIN DISPATCH SYSTEM
   // ==========================================================================
   const APPOINTMENTS_STORAGE_KEY = 'salon_hair_bird_appointments';
   const ACTIVE_BOOKING_KEY = 'salon_active_booking_id';
   const SOUND_STORAGE_KEY = 'salon_admin_sound_muted';
+  const USERS_STORAGE_KEY = 'salon_registered_users';
+  const CURRENT_USER_STORAGE_KEY = 'salon_logged_in_client';
+  const ADMIN_AUTH_STORAGE_KEY = 'salon_admin_authenticated';
 
   // Customer Feedback DOM references
   const feedbackIcon = document.getElementById('feedbackIcon');
@@ -475,15 +522,48 @@ document.addEventListener('DOMContentLoaded', () => {
   const summaryRequests = document.getElementById('summaryRequests');
   const salonNoteContainer = document.getElementById('salonNoteContainer');
   const salonNoteBody = document.getElementById('salonNoteBody');
-  const btnOpenAdminFromCustomer = document.getElementById('btnOpenAdminFromCustomer');
 
-  // Admin DOM references
-  const adminLauncherBtn = document.getElementById('adminLauncherBtn');
-  const adminLauncherBadge = document.getElementById('adminLauncherBadge');
+  // Navigation Auth DOM references
+  const navGuestGroup = document.getElementById('navGuestGroup');
+  const navUserGroup = document.getElementById('navUserGroup');
+  const navAdminGroup = document.getElementById('navAdminGroup');
+  const btnNavLogin = document.getElementById('btnNavLogin');
+  const btnNavSignup = document.getElementById('btnNavSignup');
+  const btnNavMyBookings = document.getElementById('btnNavMyBookings');
+  const navUserLabel = document.getElementById('navUserLabel');
+  const btnNavLogout = document.getElementById('btnNavLogout');
   const btnNavAdminOpen = document.getElementById('btnNavAdminOpen');
   const navAdminBadge = document.getElementById('navAdminBadge');
+  const btnNavAdminLogout = document.getElementById('btnNavAdminLogout');
+
+  // Auth Modal DOM references
+  const authModalOverlay = document.getElementById('authModalOverlay');
+  const authModalClose = document.getElementById('authModalClose');
+  const authModalTitle = document.getElementById('authModalTitle');
+  const authModalSubtitle = document.getElementById('authModalSubtitle');
+  const tabBtnLogin = document.getElementById('tabBtnLogin');
+  const tabBtnSignup = document.getElementById('tabBtnSignup');
+  const tabBtnAdmin = document.getElementById('tabBtnAdmin');
+  const authAlert = document.getElementById('authAlert');
+  const clientLoginForm = document.getElementById('clientLoginForm');
+  const clientSignupForm = document.getElementById('clientSignupForm');
+  const adminLoginForm = document.getElementById('adminLoginForm');
+  const switchToSignupBtn = document.getElementById('switchToSignupBtn');
+  const switchToLoginBtn = document.getElementById('switchToLoginBtn');
+
+  // Client Bookings Portal DOM references
+  const clientBookingsModalOverlay = document.getElementById('clientBookingsModalOverlay');
+  const clientBookingsModalClose = document.getElementById('clientBookingsModalClose');
+  const clientPortalUserName = document.getElementById('clientPortalUserName');
+  const clientBookingsList = document.getElementById('clientBookingsList');
+  const btnClientBookNewApt = document.getElementById('btnClientBookNewApt');
+
+  // Admin Dashboard DOM references
+  const adminLauncherBtn = document.getElementById('adminLauncherBtn');
+  const adminLauncherBadge = document.getElementById('adminLauncherBadge');
   const adminModalOverlay = document.getElementById('adminModalOverlay');
   const adminModalClose = document.getElementById('adminModalClose');
+  const btnAdminModalLogout = document.getElementById('btnAdminModalLogout');
   const btnAdminSoundToggle = document.getElementById('btnAdminSoundToggle');
   const adminToastContainer = document.getElementById('adminToastContainer');
 
@@ -506,7 +586,438 @@ document.addEventListener('DOMContentLoaded', () => {
   let isSoundMuted = localStorage.getItem(SOUND_STORAGE_KEY) === 'true';
   updateSoundIcon();
 
-  // Load appointments from localStorage or seed initial demonstration records
+  // --------------------------------------------------------------------------
+  // USER & AUTH STATE MANAGEMENT
+  // --------------------------------------------------------------------------
+  function getRegisteredUsers() {
+    try {
+      const data = localStorage.getItem(USERS_STORAGE_KEY);
+      if (!data) {
+        const initialUsers = [
+          {
+            id: 'USR-101',
+            name: 'Sarah Jenkins',
+            email: 'sarah@example.com',
+            phone: '0771234567',
+            password: 'password123',
+            createdAt: new Date().toISOString()
+          }
+        ];
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(initialUsers));
+        return initialUsers;
+      }
+      return JSON.parse(data) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveRegisteredUsers(users) {
+    try {
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    } catch (e) {}
+  }
+
+  function getCurrentUser() {
+    try {
+      const data = localStorage.getItem(CURRENT_USER_STORAGE_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setCurrentUser(user) {
+    try {
+      if (user) {
+        localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(user));
+      } else {
+        localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+      }
+      updateNavAuthState();
+      autofillClientBookingForm();
+    } catch (e) {}
+  }
+
+  function isAdminAuthenticated() {
+    try {
+      return sessionStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === 'true';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function setAdminAuthenticated(val) {
+    try {
+      if (val) {
+        sessionStorage.setItem(ADMIN_AUTH_STORAGE_KEY, 'true');
+      } else {
+        sessionStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+      }
+      updateNavAuthState();
+    } catch (e) {}
+  }
+
+  function autofillClientBookingForm() {
+    const user = getCurrentUser();
+    if (user) {
+      if (inputName && !inputName.value) inputName.value = user.name || '';
+      if (inputPhone && !inputPhone.value) inputPhone.value = user.phone || '';
+      if (inputEmail && !inputEmail.value) inputEmail.value = user.email || '';
+    }
+  }
+
+  function updateNavAuthState() {
+    const user = getCurrentUser();
+    const isAdmin = isAdminAuthenticated();
+
+    if (isAdmin) {
+      if (navGuestGroup) navGuestGroup.style.display = 'none';
+      if (navUserGroup) navUserGroup.style.display = 'none';
+      if (navAdminGroup) navAdminGroup.style.display = 'flex';
+      updateAdminBadges();
+    } else if (user) {
+      if (navGuestGroup) navGuestGroup.style.display = 'none';
+      if (navAdminGroup) navAdminGroup.style.display = 'none';
+      if (navUserGroup) navUserGroup.style.display = 'flex';
+      if (navUserLabel) {
+        const firstName = user.name ? user.name.split(' ')[0] : 'My';
+        navUserLabel.textContent = `${firstName}'s Bookings`;
+      }
+    } else {
+      if (navUserGroup) navUserGroup.style.display = 'none';
+      if (navAdminGroup) navAdminGroup.style.display = 'none';
+      if (navGuestGroup) navGuestGroup.style.display = 'flex';
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // AUTH MODAL LOGIC & TAB SWITCHING
+  // --------------------------------------------------------------------------
+  function showAuthAlert(msg, type = 'error') {
+    if (!authAlert) return;
+    authAlert.textContent = msg;
+    authAlert.className = `auth-alert alert-${type}`;
+    authAlert.style.display = 'block';
+  }
+
+  function clearAuthAlert() {
+    if (!authAlert) return;
+    authAlert.textContent = '';
+    authAlert.style.display = 'none';
+  }
+
+  function switchAuthTab(tabName) {
+    clearAuthAlert();
+    const tabs = [tabBtnLogin, tabBtnSignup, tabBtnAdmin];
+    tabs.forEach(t => {
+      if (t) t.classList.remove('active');
+    });
+
+    if (clientLoginForm) clientLoginForm.style.display = 'none';
+    if (clientSignupForm) clientSignupForm.style.display = 'none';
+    if (adminLoginForm) adminLoginForm.style.display = 'none';
+
+    if (tabName === 'signup') {
+      if (tabBtnSignup) tabBtnSignup.classList.add('active');
+      if (clientSignupForm) clientSignupForm.style.display = 'block';
+      if (authModalTitle) authModalTitle.textContent = 'Create Client Account';
+      if (authModalSubtitle) authModalSubtitle.textContent = 'Register to enjoy instant reservations & exclusive styling perks';
+    } else if (tabName === 'admin') {
+      if (tabBtnAdmin) tabBtnAdmin.classList.add('active');
+      if (adminLoginForm) adminLoginForm.style.display = 'block';
+      if (authModalTitle) authModalTitle.textContent = 'Salon Staff Authentication';
+      if (authModalSubtitle) authModalSubtitle.textContent = 'Restricted dispatch portal for authorized salon team members only';
+    } else {
+      // Default: login
+      if (tabBtnLogin) tabBtnLogin.classList.add('active');
+      if (clientLoginForm) clientLoginForm.style.display = 'block';
+      if (authModalTitle) authModalTitle.textContent = 'Welcome Back';
+      if (authModalSubtitle) authModalSubtitle.textContent = 'Sign in to access your personal booking history & schedule appointments';
+    }
+  }
+
+  function openAuthModal(tab = 'login') {
+    if (!authModalOverlay) return;
+    switchAuthTab(tab);
+    authModalOverlay.classList.add('show');
+    authModalOverlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeAuthModal() {
+    if (!authModalOverlay) return;
+    authModalOverlay.classList.remove('show');
+    authModalOverlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    clearAuthAlert();
+  }
+
+  if (btnNavLogin) btnNavLogin.addEventListener('click', () => openAuthModal('login'));
+  if (btnNavSignup) btnNavSignup.addEventListener('click', () => openAuthModal('signup'));
+  if (switchToSignupBtn) switchToSignupBtn.addEventListener('click', () => switchAuthTab('signup'));
+  if (switchToLoginBtn) switchToLoginBtn.addEventListener('click', () => switchAuthTab('login'));
+  if (tabBtnLogin) tabBtnLogin.addEventListener('click', () => switchAuthTab('login'));
+  if (tabBtnSignup) tabBtnSignup.addEventListener('click', () => switchAuthTab('signup'));
+  if (tabBtnAdmin) tabBtnAdmin.addEventListener('click', () => switchAuthTab('admin'));
+  if (authModalClose) authModalClose.addEventListener('click', closeAuthModal);
+
+  if (authModalOverlay) {
+    authModalOverlay.addEventListener('click', (e) => {
+      if (e.target === authModalOverlay) closeAuthModal();
+    });
+  }
+
+  // Client Login Form Submit
+  if (clientLoginForm) {
+    clientLoginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const identifier = document.getElementById('loginIdentifier').value.trim();
+      const password = document.getElementById('loginPassword').value.trim();
+
+      if (!identifier || !password) {
+        showAuthAlert('Please enter your email/phone and password.');
+        return;
+      }
+
+      const users = getRegisteredUsers();
+      const user = users.find(u => 
+        (u.email.toLowerCase() === identifier.toLowerCase() || u.phone === identifier) && 
+        u.password === password
+      );
+
+      if (user) {
+        setCurrentUser(user);
+        closeAuthModal();
+        showAdminToast('Signed In ✓', `Welcome back, <strong>${user.name}</strong>!`);
+        openClientBookingsModal();
+      } else {
+        showAuthAlert('Invalid credentials. If you are new, click "Create Account".');
+      }
+    });
+  }
+
+  // Client Sign Up Form Submit
+  if (clientSignupForm) {
+    clientSignupForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('signupName').value.trim();
+      const phone = document.getElementById('signupPhone').value.trim();
+      const email = document.getElementById('signupEmail').value.trim();
+      const password = document.getElementById('signupPassword').value.trim();
+
+      if (!name || !phone || !email || !password) {
+        showAuthAlert('Please complete all required fields.');
+        return;
+      }
+
+      if (!isValidPhone(phone)) {
+        showAuthAlert('Please enter a valid 10-digit phone number.');
+        return;
+      }
+
+      if (!isValidEmail(email)) {
+        showAuthAlert('Please enter a valid email address.');
+        return;
+      }
+
+      const users = getRegisteredUsers();
+      if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+        showAuthAlert('An account with this email already exists. Please log in.');
+        return;
+      }
+
+      const newUser = {
+        id: 'USR-' + Math.floor(1000 + Math.random() * 9000),
+        name,
+        phone,
+        email,
+        password,
+        createdAt: new Date().toISOString()
+      };
+
+      users.push(newUser);
+      saveRegisteredUsers(users);
+      setCurrentUser(newUser);
+      closeAuthModal();
+      showAdminToast('Account Created ✓', `Welcome to Salon Hair Bride, <strong>${newUser.name}</strong>!`);
+      openClientBookingsModal();
+    });
+  }
+
+  // Admin Login Form Submit
+  if (adminLoginForm) {
+    adminLoginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const username = document.getElementById('adminUsername').value.trim();
+      const password = document.getElementById('adminPassword').value.trim();
+
+      if (username === 'admin' && (password === 'admin123' || password === '1234')) {
+        setAdminAuthenticated(true);
+        closeAuthModal();
+        showAdminToast('Admin Authenticated ✓', 'Salon Live Dispatch Dashboard unlocked.');
+        openAdminModal();
+      } else {
+        showAuthAlert('Access Denied: Invalid Admin Credentials.');
+      }
+    });
+  }
+
+  // Logout Handlers
+  if (btnNavLogout) {
+    btnNavLogout.addEventListener('click', () => {
+      setCurrentUser(null);
+      showAdminToast('Signed Out', 'You have been logged out.');
+    });
+  }
+
+  function handleAdminLogout() {
+    setAdminAuthenticated(false);
+    closeAdminModal();
+    showAdminToast('Admin Locked', 'Admin session has been locked and signed out.');
+  }
+
+  if (btnNavAdminLogout) btnNavAdminLogout.addEventListener('click', handleAdminLogout);
+  if (btnAdminModalLogout) btnAdminModalLogout.addEventListener('click', handleAdminLogout);
+
+  // --------------------------------------------------------------------------
+  // CLIENT PORTAL: MY BOOKINGS HISTORY (PRIVACY RESTRICTED)
+  // --------------------------------------------------------------------------
+  function openClientBookingsModal() {
+    const user = getCurrentUser();
+    if (!user) {
+      openAuthModal('login');
+      return;
+    }
+
+    if (!clientBookingsModalOverlay) return;
+    if (clientPortalUserName) clientPortalUserName.textContent = user.name;
+
+    renderClientBookings(user);
+    clientBookingsModalOverlay.classList.add('show');
+    clientBookingsModalOverlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeClientBookingsModal() {
+    if (!clientBookingsModalOverlay) return;
+    clientBookingsModalOverlay.classList.remove('show');
+    clientBookingsModalOverlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  function renderClientBookings(user) {
+    if (!clientBookingsList) return;
+    const allAppointments = getStoredAppointments();
+
+    // STRICT PRIVACY: Filter ONLY appointments belonging to the logged-in client
+    const userAppointments = allAppointments.filter(apt => 
+      (apt.userId && apt.userId === user.id) ||
+      (apt.email && apt.email.toLowerCase() === user.email.toLowerCase()) ||
+      (apt.phone && apt.phone === user.phone)
+    );
+
+    if (userAppointments.length === 0) {
+      clientBookingsList.innerHTML = `
+        <div class="admin-empty-state" style="padding: 2.5rem 1rem;">
+          <div class="empty-state-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <h4 class="empty-state-title">No Reservations Found</h4>
+          <p>You haven't booked any salon appointments yet. Click below to schedule your personalized session!</p>
+          <button type="button" class="btn btn-primary btn-sm" id="btnEmptyBookApt" style="margin-top: 1rem;">Book an Appointment</button>
+        </div>
+      `;
+
+      const btnEmptyBook = document.getElementById('btnEmptyBookApt');
+      if (btnEmptyBook) {
+        btnEmptyBook.addEventListener('click', () => {
+          closeClientBookingsModal();
+          const aptSection = document.getElementById('appointment');
+          if (aptSection) aptSection.scrollIntoView({ behavior: 'smooth' });
+        });
+      }
+      return;
+    }
+
+    clientBookingsList.innerHTML = userAppointments.map(apt => {
+      const isPending = apt.status === 'pending';
+      const isConfirmed = apt.status === 'confirmed';
+
+      const statusBadge = isPending
+        ? '<span class="badge-status badge-pending"><span class="pulse-dot"></span> Awaiting Confirmation</span>'
+        : isConfirmed
+        ? '<span class="badge-status badge-confirmed">✓ Confirmed</span>'
+        : '<span class="badge-status badge-cancelled">Slot Unavailable</span>';
+
+      const createdFormatted = new Date(apt.createdAt).toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      return `
+        <div class="client-booking-card">
+          <div class="client-booking-header">
+            <span class="client-booking-id">#${apt.id} • Booked on ${createdFormatted}</span>
+            <div>${statusBadge}</div>
+          </div>
+          <div class="client-booking-grid">
+            <div class="client-booking-field">
+              <span class="client-field-label">Service</span>
+              <span class="client-field-val">${escapeHtml(apt.service)}</span>
+            </div>
+            <div class="client-booking-field">
+              <span class="client-field-label">Date &amp; Time</span>
+              <span class="client-field-val">${escapeHtml(apt.date)} • ${escapeHtml(apt.time)}</span>
+            </div>
+            <div class="client-booking-field">
+              <span class="client-field-label">Contact Phone</span>
+              <span class="client-field-val">${escapeHtml(apt.phone)}</span>
+            </div>
+          </div>
+          ${apt.message && apt.message !== 'None' ? `
+            <div style="font-size:0.8125rem; color: var(--color-text-muted); margin-bottom: 0.5rem;">
+              <strong>Special Request:</strong> "${escapeHtml(apt.message)}"
+            </div>
+          ` : ''}
+          ${apt.adminNote ? `
+            <div class="client-booking-note">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <div><strong>Salon Update:</strong> ${escapeHtml(apt.adminNote)}</div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (btnNavMyBookings) btnNavMyBookings.addEventListener('click', openClientBookingsModal);
+  if (clientBookingsModalClose) clientBookingsModalClose.addEventListener('click', closeClientBookingsModal);
+
+  if (clientBookingsModalOverlay) {
+    clientBookingsModalOverlay.addEventListener('click', (e) => {
+      if (e.target === clientBookingsModalOverlay) closeClientBookingsModal();
+    });
+  }
+
+  if (btnClientBookNewApt) {
+    btnClientBookNewApt.addEventListener('click', () => {
+      closeClientBookingsModal();
+      const aptSection = document.getElementById('appointment');
+      if (aptSection) aptSection.scrollIntoView({ behavior: 'smooth' });
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // MASTER APPOINTMENTS STORAGE & DISPATCH
+  // --------------------------------------------------------------------------
   function getStoredAppointments() {
     try {
       const data = localStorage.getItem(APPOINTMENTS_STORAGE_KEY);
@@ -562,7 +1073,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Play dual-tone luxury chime bell via Web Audio API
+  // Play luxury chime alert
   function playAdminChime() {
     if (isSoundMuted) return;
     try {
@@ -584,9 +1095,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const now = ctx.currentTime;
       playTone(587.33, now, 0.45);        // D5
       playTone(880.00, now + 0.12, 0.65); // A5
-    } catch (e) {
-      // AudioContext policy
-    }
+    } catch (e) {}
   }
 
   function updateSoundIcon() {
@@ -613,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Display floating toast message
+  // Floating toast message
   function showAdminToast(title, message) {
     if (!adminToastContainer) return;
     const toast = document.createElement('div');
@@ -652,6 +1161,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = getStoredAppointments();
     const newApt = {
       id: 'APT-' + Math.floor(10000 + Math.random() * 90000),
+      userId: data.userId || null,
       name: data.name,
       phone: data.phone,
       email: data.email || 'customer@example.com',
@@ -688,7 +1198,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     updateAdminBadges();
-    renderAdminDashboard();
+    if (isAdminAuthenticated()) {
+      renderAdminDashboard();
+    }
     return newApt;
   }
 
@@ -720,7 +1232,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (salonNoteContainer) salonNoteContainer.classList.add('has-note');
       if (salonNoteBody) {
-        salonNoteBody.textContent = apt.adminNote || 'Confirmed! We look forward to welcoming you at Salon Hair Bird.';
+        salonNoteBody.textContent = apt.adminNote || 'Confirmed! We look forward to welcoming you at Salon Hair Bride.';
       }
     } else if (apt.status === 'cancelled') {
       if (formSuccessMessage) formSuccessMessage.classList.remove('is-confirmed');
@@ -799,8 +1311,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Render Admin Dashboard modal contents
+  // Render Admin Dashboard modal contents (STRICTLY FOR AUTHENTICATED ADMIN)
   function renderAdminDashboard() {
+    if (!isAdminAuthenticated()) return;
+
     const list = getStoredAppointments();
 
     const totalCount = list.length;
@@ -909,7 +1423,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <!-- Admin Custom Message/Note Input Section -->
           <div class="booking-admin-note-section">
             <div class="admin-note-label-row">
-              <span>Salon Confirmation Note & Special Instructions:</span>
+              <span>Salon Confirmation Note &amp; Special Instructions:</span>
             </div>
             ${apt.adminNote ? `<p class="admin-current-note-display">"${escapeHtml(apt.adminNote)}"</p>` : ''}
             
@@ -977,7 +1491,7 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmBtn.addEventListener('click', () => {
           const customNote = (noteInput && noteInput.value.trim()) 
             ? noteInput.value.trim() 
-            : 'Confirmed! Looking forward to seeing you at Salon Hair Bird.';
+            : 'Confirmed! Looking forward to seeing you at Salon Hair Bride.';
           updateAppointmentStatus(aptId, 'confirmed', customNote);
           showAdminToast('Appointment Confirmed!', `Booking #${aptId} status is now Confirmed.`);
         });
@@ -1039,7 +1553,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // -----------------------------------------------------------------------
   // EmailJS – Send Confirmation / Status Update Email to Customer
-  // Credentials: Service ID: service_835kk9j | Template ID: template_zm5jy8q
   // -----------------------------------------------------------------------
   function sendConfirmationEmail(apt) {
     if (typeof emailjs === 'undefined') {
@@ -1082,8 +1595,11 @@ document.addEventListener('DOMContentLoaded', () => {
       apt.updatedAt = new Date().toISOString();
       saveAppointments(list, true);
       updateAdminBadges();
-      renderAdminDashboard();
+      if (isAdminAuthenticated()) {
+        renderAdminDashboard();
+      }
       syncActiveCustomerBooking();
+      updateAvailableSlots();
 
       // Trigger EmailJS confirmation / status-update email to customer
       sendConfirmationEmail(apt);
@@ -1097,7 +1613,9 @@ document.addEventListener('DOMContentLoaded', () => {
       apt.adminNote = note;
       apt.updatedAt = new Date().toISOString();
       saveAppointments(list, true);
-      renderAdminDashboard();
+      if (isAdminAuthenticated()) {
+        renderAdminDashboard();
+      }
       syncActiveCustomerBooking();
     }
   }
@@ -1106,12 +1624,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = getStoredAppointments().filter(item => item.id !== id);
     saveAppointments(list, true);
     updateAdminBadges();
-    renderAdminDashboard();
+    if (isAdminAuthenticated()) {
+      renderAdminDashboard();
+    }
     syncActiveCustomerBooking();
+    updateAvailableSlots();
   }
 
-  // Open & Close Admin Modal
+  // Open & Close Admin Modal (REQUIRES ADMIN AUTHENTICATION)
   function openAdminModal() {
+    if (!isAdminAuthenticated()) {
+      openAuthModal('admin');
+      return;
+    }
+
     if (!adminModalOverlay) return;
     adminModalOverlay.classList.add('show');
     adminModalOverlay.setAttribute('aria-hidden', 'false');
@@ -1128,7 +1654,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (adminLauncherBtn) adminLauncherBtn.addEventListener('click', openAdminModal);
   if (btnNavAdminOpen) btnNavAdminOpen.addEventListener('click', openAdminModal);
-  if (btnOpenAdminFromCustomer) btnOpenAdminFromCustomer.addEventListener('click', openAdminModal);
   if (adminModalClose) adminModalClose.addEventListener('click', closeAdminModal);
 
   if (adminModalOverlay) {
@@ -1186,6 +1711,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateAdminBadges();
         renderAdminDashboard();
         syncActiveCustomerBooking();
+        updateAvailableSlots();
         showAdminToast('Dashboard Cleared', 'All appointments cleared.');
       }
     });
@@ -1198,6 +1724,11 @@ document.addEventListener('DOMContentLoaded', () => {
       renderAdminDashboard();
     }
     syncActiveCustomerBooking();
+    updateAvailableSlots();
+    const user = getCurrentUser();
+    if (user && clientBookingsModalOverlay && clientBookingsModalOverlay.classList.contains('show')) {
+      renderClientBookings(user);
+    }
   });
 
   window.addEventListener('storage', (e) => {
@@ -1207,24 +1738,59 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAdminDashboard();
       }
       syncActiveCustomerBooking();
+      updateAvailableSlots();
     }
   });
 
   // Check on escape key
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (authModalOverlay && authModalOverlay.classList.contains('show')) {
+        closeAuthModal();
+      }
+      if (clientBookingsModalOverlay && clientBookingsModalOverlay.classList.contains('show')) {
+        closeClientBookingsModal();
+      }
       if (adminModalOverlay && adminModalOverlay.classList.contains('show')) {
         closeAdminModal();
       }
     }
   });
 
+  // Hash-based direct route handling (e.g. #admin or #my-bookings)
+  function handleUrlHash() {
+    const hash = window.location.hash;
+    if (hash === '#admin' || hash === '#/admin') {
+      if (isAdminAuthenticated()) {
+        openAdminModal();
+      } else {
+        openAuthModal('admin');
+      }
+    } else if (hash === '#my-bookings') {
+      if (getCurrentUser()) {
+        openClientBookingsModal();
+      } else {
+        openAuthModal('login');
+      }
+    } else if (hash === '#login') {
+      openAuthModal('login');
+    } else if (hash === '#signup') {
+      openAuthModal('signup');
+    }
+  }
+
+  window.addEventListener('hashchange', handleUrlHash);
+
   // Initial setup on load
+  updateNavAuthState();
+  autofillClientBookingForm();
   updateAdminBadges();
   syncActiveCustomerBooking();
+  updateAvailableSlots();
+  handleUrlHash();
 
   // Log confirmation in console for evaluators
-  console.log('✨ Salon Hair Bird Landing Page initialized successfully.');
+  console.log('✨ Salon Hair Bride Landing Page initialized successfully.');
   console.log('📍 Colombo, Sri Lanka | Phone: 077 123 4567');
 });
 
@@ -1240,7 +1806,7 @@ function sendFormDirectToWhatsApp() {
         let messageText = document.getElementById("bookingMessage") ? document.getElementById("bookingMessage").value.trim() : "";
 
         if (!name || !phone || !service || !date) {
-            alert("කරුණාකර Name, Phone Number, Service සහ Preferred Date යන සියලුම විස්තර ඇතුළත් කරන්න.");
+            alert("place Enter Name, Phone Number, Service and  Preferred Date .");
             return;
         }
 

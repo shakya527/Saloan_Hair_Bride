@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -54,17 +54,13 @@
   <header class="site-header" id="navbar">
     <div class="container header-container">
       <!-- Logo -->
-      <a href="#home" class="brand-logo" aria-label="Salon Hair Bird Home">
-        <span class="logo-mark">
-          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="20" cy="20" r="18" stroke="#C5A880" stroke-width="2"/>
-            <path d="M12 26 C15 17, 21 12, 30 11 C26 16, 22 19, 20 25 C18 21, 16 18, 12 26 Z" fill="#C5A880"/>
-            <circle cx="28" cy="10" r="1.8" fill="#E8D1B2"/>
-          </svg>
-        </span>
+      <a href="#home" class="brand-logo" aria-label="Salon Hair Bride Home">
+        <div class="logo-circle">
+          <img src="LOGO_new.png" alt="Salon Hair Bride" class="logo-img-main">
+        </div>
         <span class="logo-text">
-          <span class="brand-name">Salon Hair Bird</span>
-          <span class="brand-sub">HAIR & BEAUTY STUDIO</span>
+          <span class="brand-name">Salon Hair Bride</span>
+          <span class="brand-sub">HAIR &amp; BEAUTY STUDIO</span>
         </span>
       </a>
 
@@ -81,13 +77,40 @@
         </ul>
       </nav>
 
-      <!-- CTA Button & Mobile Hamburger Toggle -->
-      <div class="header-actions">
-        <button type="button" onclick="sendFormDirectToWhatsApp()" class="btn btn-whatsapp-direct">
-  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984 0 1.762.459 3.48 1.332 5.001l-1.416 5.17 5.291-1.388c1.464.798 3.115 1.218 4.78 1.218h.004c5.507 0 9.99-4.478 9.99-9.984 0-2.668-1.039-5.176-2.927-7.065C17.188 3.039 14.68 2 12.012 2zm5.836 14.28c-.244.688-1.231 1.258-1.693 1.316-.462.058-1.066.21-3.666-.826-2.222-.886-3.66-3.14-3.771-3.288-.112-.148-.902-1.2-1.002-2.316-.1-1.116.48-1.664.721-1.91.241-.246.525-.308.7-.308.175 0 .35.001.503.008.162.008.38-.061.595.454.22.525.751 1.834.817 1.968.066.134.11.291.022.468-.088.177-.132.287-.263.441-.131.154-.277.344-.395.462-.132.132-.27.276-.116.541.154.265.684 1.129 1.468 1.826 1.008.897 1.858 1.176 2.123 1.308.265.132.42.11.575-.066.155-.176.663-.772.84-1.037.176-.265.352-.22.595-.132.243.088 1.543.728 1.808.86.265.132.441.198.507.308.066.11.066.638-.178 1.326z"/></svg>
-  <span>Book via WhatsApp</span>
-</button>
-        <a href="#appointment" class="btn btn-primary btn-nav">Book Appointment</a>
+      <!-- CTA & Auth Action Buttons -->
+      <div class="header-actions" id="navAuthActions">
+        <!-- Guest State (Default): Login & Sign Up -->
+        <div class="auth-btn-group" id="navGuestGroup">
+          <button type="button" class="btn btn-nav-login" id="btnNavLogin">Login</button>
+          <button type="button" class="btn btn-nav-signup" id="btnNavSignup">Sign Up</button>
+        </div>
+
+        <!-- Authenticated Client State -->
+        <div class="auth-btn-group auth-user-group" id="navUserGroup" style="display: none;">
+          <button type="button" class="btn btn-nav-user" id="btnNavMyBookings">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <span id="navUserLabel">My Bookings</span>
+          </button>
+          <button type="button" class="btn-nav-logout" id="btnNavLogout" title="Sign Out">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span>Logout</span>
+          </button>
+        </div>
+
+        <!-- Authenticated Admin State -->
+        <div class="auth-btn-group auth-admin-group" id="navAdminGroup" style="display: none;">
+          <button type="button" class="btn btn-nav-admin" id="btnNavAdminOpen">
+            <span class="live-dot"></span>
+            <span>Admin Dispatch</span>
+            <span class="nav-admin-badge" id="navAdminBadge" style="display:none;">0</span>
+          </button>
+          <button type="button" class="btn-nav-logout" id="btnNavAdminLogout" title="Lock & Logout">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span>Logout</span>
+          </button>
+        </div>
+
+        <!-- Mobile Menu Toggle -->
         <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle Navigation Menu" aria-expanded="false" aria-controls="navMenu">
           <span class="bar"></span>
           <span class="bar"></span>
@@ -761,7 +784,6 @@
 
               <div class="feedback-actions">
                 <button type="button" class="btn btn-secondary btn-sm" id="btnResetForm">Book Another Appointment</button>
-                <button type="button" class="btn btn-primary btn-sm btn-admin-shortcut" id="btnOpenAdminFromCustomer">Open Admin View</button>
               </div>
             </div>
 
@@ -1106,11 +1128,141 @@
   </button>
 
   <!-- =========================================================================
-       SALON ADMIN LIVE NOTIFICATION & CONFIRMATION PANEL
+       USER AUTHENTICATION & LOGIN/SIGNUP MODAL
+       ========================================================================= -->
+  <div class="auth-modal-overlay" id="authModalOverlay" role="dialog" aria-modal="true" aria-labelledby="authModalTitle" aria-hidden="true">
+    <div class="auth-modal">
+      <div class="auth-modal-header">
+        <div class="auth-header-brand">
+          <div class="auth-logo-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>
+            <h3 class="auth-modal-title" id="authModalTitle">Welcome to Salon Hair Bride</h3>
+            <p class="auth-modal-subtitle" id="authModalSubtitle">Sign in to manage your appointments &amp; beauty history</p>
+          </div>
+        </div>
+        <button type="button" class="auth-modal-close" id="authModalClose" aria-label="Close Authentication Modal">&times;</button>
+      </div>
+
+      <!-- Auth Navigation Tabs -->
+      <div class="auth-tabs" role="tablist">
+        <button type="button" class="auth-tab active" data-auth-tab="login" id="tabBtnLogin">Client Login</button>
+        <button type="button" class="auth-tab" data-auth-tab="signup" id="tabBtnSignup">Create Account</button>
+        <button type="button" class="auth-tab" data-auth-tab="admin" id="tabBtnAdmin">Staff / Admin</button>
+      </div>
+
+      <!-- Alert / Notice Box -->
+      <div class="auth-alert" id="authAlert" style="display: none;"></div>
+
+      <!-- Tab 1: Client Login Form -->
+      <form id="clientLoginForm" class="auth-form active">
+        <div class="form-group">
+          <label for="loginIdentifier" class="form-label">Email or Phone Number <span class="required">*</span></label>
+          <input type="text" id="loginIdentifier" class="form-input" placeholder="e.g. sarah@example.com or 0771234567" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword" class="form-label">Password <span class="required">*</span></label>
+          <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block auth-submit-btn">
+          <span>Log In</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <div class="auth-switch-prompt">
+          <span>New to Salon Hair Bride?</span>
+          <button type="button" class="auth-link-btn" id="switchToSignupBtn">Create an account</button>
+        </div>
+      </form>
+
+      <!-- Tab 2: Client Sign Up Form -->
+      <form id="clientSignupForm" class="auth-form" style="display: none;">
+        <div class="form-group">
+          <label for="signupName" class="form-label">Full Name <span class="required">*</span></label>
+          <input type="text" id="signupName" class="form-input" placeholder="e.g. Sarah Jenkins" autocomplete="name" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="signupPhone" class="form-label">Phone Number <span class="required">*</span></label>
+            <input type="tel" id="signupPhone" class="form-input" placeholder="0771234567" maxlength="10" autocomplete="tel" required>
+          </div>
+          <div class="form-group">
+            <label for="signupEmail" class="form-label">Email Address <span class="required">*</span></label>
+            <input type="email" id="signupEmail" class="form-input" placeholder="sarah@example.com" autocomplete="email" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="signupPassword" class="form-label">Create Password <span class="required">*</span></label>
+          <input type="password" id="signupPassword" class="form-input" placeholder="Minimum 4 characters" minlength="4" autocomplete="new-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block auth-submit-btn">
+          <span>Create My Account</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <div class="auth-switch-prompt">
+          <span>Already have an account?</span>
+          <button type="button" class="auth-link-btn" id="switchToLoginBtn">Log in here</button>
+        </div>
+      </form>
+
+      <!-- Tab 3: Authenticated Admin Login Form -->
+      <form id="adminLoginForm" class="auth-form" style="display: none;">
+        <div class="admin-auth-notice">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Authorized Salon Management Only. Master booking dispatch &amp; client contact records are password-protected.</span>
+        </div>
+        <div class="form-group">
+          <label for="adminUsername" class="form-label">Admin Username <span class="required">*</span></label>
+          <input type="text" id="adminUsername" class="form-input" placeholder="e.g. admin" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="adminPassword" class="form-label">Admin Master Password / PIN <span class="required">*</span></label>
+          <input type="password" id="adminPassword" class="form-input" placeholder="Enter admin password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block auth-submit-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Authenticate &amp; Open Dispatch</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       CLIENT PORTAL: MY BOOKINGS HISTORY MODAL (PRIVACY RESTRICTED)
+       ========================================================================= -->
+  <div class="client-modal-overlay" id="clientBookingsModalOverlay" role="dialog" aria-modal="true" aria-labelledby="clientPortalTitle" aria-hidden="true">
+    <div class="client-modal">
+      <div class="client-modal-header">
+        <div class="client-header-title-wrap">
+          <div class="client-brand-pill">
+            <span class="user-avatar-dot"></span>
+            <span id="clientPortalBadge">CLIENT SANCTUARY</span>
+          </div>
+          <h2 class="client-modal-title" id="clientPortalTitle">My Appointment History</h2>
+          <p class="client-modal-subtitle" id="clientPortalUserSubtitle">Personal reservations for <strong id="clientPortalUserName">Client</strong></p>
+        </div>
+        <div class="client-header-controls">
+          <button type="button" class="btn btn-sm btn-secondary" id="btnClientBookNewApt">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Book New</span>
+          </button>
+          <button type="button" class="client-modal-close" id="clientBookingsModalClose" aria-label="Close My Bookings">&times;</button>
+        </div>
+      </div>
+
+      <!-- Client Bookings Stream (Only Logged-in User's Bookings) -->
+      <div class="client-bookings-container" id="clientBookingsList">
+        <!-- Rendered dynamically by JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       SALON ADMIN LIVE NOTIFICATION & CONFIRMATION PANEL (AUTHENTICATED ONLY)
        ========================================================================= -->
 
   <!-- Floating Admin Launcher Button -->
-  <button class="admin-launcher-btn" id="adminLauncherBtn" aria-label="Open Salon Admin Panel" title="Open Salon Admin Panel">
+  <button class="admin-launcher-btn" id="adminLauncherBtn" aria-label="Open Salon Admin Panel" title="Open Salon Admin Panel (Admin Authentication Required)">
     <div class="admin-launcher-icon-wrap">
       <svg class="admin-bell-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -1132,14 +1284,18 @@
         <div class="admin-header-title-wrap">
           <div class="admin-brand-pill">
             <span class="live-dot"></span>
-            <span>LIVE DISPATCH</span>
+            <span>RESTRICTED ADMIN DISPATCH</span>
           </div>
-          <h2 class="admin-modal-title" id="adminModalTitle">Salon Appointments & Confirmation Dashboard</h2>
+          <h2 class="admin-modal-title" id="adminModalTitle">Salon Appointments &amp; Confirmation Dashboard</h2>
         </div>
         <div class="admin-header-controls">
           <button type="button" class="btn-admin-icon" id="btnAdminSoundToggle" title="Toggle Alert Sound" aria-label="Toggle Alert Sound">
             <svg class="icon-sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
             <svg class="icon-sound-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+          </button>
+          <button type="button" class="btn-admin-logout" id="btnAdminModalLogout" title="Lock &amp; Logout of Admin Panel">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span>Lock &amp; Logout</span>
           </button>
           <button type="button" class="admin-modal-close" id="adminModalClose" aria-label="Close Admin Dashboard">&times;</button>
         </div>

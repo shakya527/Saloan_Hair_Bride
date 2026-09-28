@@ -334,51 +334,109 @@ button, input, select, textarea {
 .header-container {
   height: var(--header-height);
   display: flex;
-  align-items: center;
+  align-items: center;           /* all three zones perfectly centred */
   justify-content: space-between;
+  gap: clamp(0.75rem, 2vw, 1.5rem); /* breathing room between logo/nav/actions */
+  flex-wrap: nowrap;             /* never spill onto a second row */
+  overflow: visible;
 }
 
-/* Logo */
+/* ── Logo ────────────────────────────────────────────────────────────── */
 .brand-logo {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.85rem;
   user-select: none;
+  flex-shrink: 0;
+  text-decoration: none;
 }
 
-.logo-mark {
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* ── Circular container with gold ring ─────────────────────────────── */
+.logo-circle {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+
+  /* Layered gold ring: inner soft glow + outer crisp line */
+  box-shadow:
+    0 0 0 2px #C5A880,               /* solid gold ring                  */
+    0 0 0 4px rgba(197, 168, 128, 0.18), /* soft outer halo               */
+    0 4px 14px rgba(197, 168, 128, 0.22); /* warm ambient shadow          */
 }
 
-.logo-mark svg {
-  width: 100%;
-  height: 100%;
+/* Soft artistic edge haze — radial gradient overlay on top of the image */
+.logo-circle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    transparent 52%,                  /* clear centre — logo fully visible */
+    rgba(250, 247, 242, 0.45) 72%,   /* gentle cream mist starts          */
+    rgba(250, 247, 242, 0.82) 88%,   /* softens toward the gold ring      */
+    rgba(250, 247, 242, 0.95) 100%   /* near-opaque edge fade             */
+  );
+  pointer-events: none;              /* clicks pass through to the image   */
+  z-index: 1;
 }
 
+/* ── Logo image inside the circle ──────────────────────────────────── */
+.logo-img-main {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  object-position: center 10%;       /* crop slightly up — shows the face */
+  display: block;
+
+  /* Maximum sharpness on all browsers & retina screens */
+  image-rendering: auto;             /* browser-chosen best interpolation  */
+  -ms-interpolation-mode: bicubic;
+
+  /* Sub-pixel GPU compositing — prevents soft blur on fractional pixels */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* ── Brand text (name + tagline) vertically centred beside circle ─── */
 .logo-text {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  gap: 0.1rem;
 }
 
 .brand-name {
   font-family: var(--font-serif);
-  font-size: 1.35rem;
+  font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--color-dark);
-  line-height: 1.1;
+  line-height: 1.15;
+  white-space: nowrap;
 }
 
 .brand-sub {
-  font-size: 0.625rem;
+  font-size: 0.6rem;
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   color: var(--color-primary-dark);
   text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── Mobile 360px — scale circle down proportionally ───────────────── */
+@media (max-width: 360px) {
+  .logo-circle,
+  .logo-img-main {
+    width: 54px;
+    height: 54px;
+  }
+  .brand-name { font-size: 1rem; }
 }
 
 /* Navigation Links (Desktop) */
@@ -386,12 +444,18 @@ button, input, select, textarea {
 .nav-links {
   display: flex;
   align-items: center;
+  flex-shrink: 0;            /* never let the nav get squeezed */
 }
 
 .nav-list {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  /* fluid gap: tighter at ~1024px, comfortable at ≥1280px */
+  gap: clamp(1.1rem, 2vw, 2rem);
+  flex-wrap: nowrap;         /* single horizontal line always */
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .nav-link {
@@ -400,6 +464,8 @@ button, input, select, textarea {
   color: var(--color-dark);
   position: relative;
   padding: 0.5rem 0;
+  white-space: nowrap;       /* "Why Us" stays on one line */
+  line-height: 1;
   transition: color 0.25s;
 }
 
@@ -424,11 +490,114 @@ button, input, select, textarea {
   width: 100%;
 }
 
+/* Header actions (buttons & auth) */
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: clamp(0.5rem, 1.2vw, 1rem);
+  flex-shrink: 0;            /* buttons never collapse */
+  flex-wrap: nowrap;
 }
+
+.auth-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+/* 1. Login Button — Clean Outline / Secondary */
+.btn-nav-login {
+  background: transparent;
+  color: var(--color-dark);
+  border: 1.5px solid rgba(22, 22, 22, 0.28);
+  padding: 0.55rem 1.15rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  border-radius: var(--border-radius-pill);
+  cursor: pointer;
+  transition: var(--transition-standard);
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  line-height: 1.2;
+}
+
+.btn-nav-login:hover {
+  background: var(--color-dark);
+  color: #FFFFFF;
+  border-color: var(--color-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(22, 22, 22, 0.15);
+}
+
+/* 2. Sign Up Button — Prominent Luxury Brand Primary */
+.btn-nav-signup {
+  background: linear-gradient(135deg, #D4B692 0%, #C5A880 100%);
+  color: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  padding: 0.58rem 1.35rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: var(--border-radius-pill);
+  cursor: pointer;
+  transition: var(--transition-standard);
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  line-height: 1.2;
+  box-shadow: 0 4px 14px rgba(197, 168, 128, 0.35);
+}
+
+.btn-nav-signup:hover {
+  background: linear-gradient(135deg, #C5A880 0%, #B8966C 100%);
+  color: #000000;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(197, 168, 128, 0.5);
+}
+
+/* 3. Authenticated User & Admin Navigation Buttons */
+.btn-nav-user {
+  background: var(--color-cream-alt);
+  color: var(--color-dark);
+  border: 1px solid var(--color-primary);
+  padding: 0.52rem 1.15rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: var(--border-radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: var(--transition-standard);
+}
+
+.btn-nav-user:hover {
+  background: var(--color-dark);
+  color: var(--color-primary-light);
+  transform: translateY(-1px);
+}
+
+.btn-nav-logout {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid transparent;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: var(--border-radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.btn-nav-logout:hover {
+  color: var(--color-error);
+  background-color: rgba(217, 68, 54, 0.08);
+}
+
+
 
 /* Mobile Hamburger Toggle */
 .mobile-toggle {
@@ -2511,9 +2680,6 @@ button, input, select, textarea {
 
 /* 360px & Below: Small Mobile Devices */
 @media (max-width: 360px) {
-  .brand-name {
-    font-size: 1.15rem;
-  }
 
   .hero-title {
     font-size: 1.85rem;
@@ -3662,4 +3828,370 @@ button, input, select, textarea {
 
 .btn-whatsapp-direct:hover {
     background-color: #1ebd5b;
+}
+
+/* ==========================================================================
+   AUTHENTICATION & CLIENT PORTAL MODALS
+   ========================================================================== */
+.auth-modal-overlay,
+.client-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(18, 18, 18, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.auth-modal-overlay.show,
+.client-modal-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.auth-modal,
+.client-modal {
+  background-color: #FFFFFF;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(197, 168, 128, 0.25);
+  width: 100%;
+  max-width: 480px;
+  overflow: hidden;
+  transform: translateY(20px) scale(0.97);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-sans);
+}
+
+.client-modal {
+  max-width: 680px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-modal-overlay.show .auth-modal,
+.client-modal-overlay.show .client-modal {
+  transform: translateY(0) scale(1);
+}
+
+.auth-modal-header,
+.client-modal-header {
+  padding: 1.5rem 1.75rem 1.25rem;
+  background-color: var(--color-cream);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.auth-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.auth-logo-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1C1C1C 0%, #2A2A2A 100%);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-primary);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.auth-logo-badge svg {
+  width: 20px;
+  height: 20px;
+}
+
+.auth-modal-title {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-dark);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.auth-modal-subtitle {
+  font-size: 0.775rem;
+  color: var(--color-text-muted);
+  margin: 2px 0 0;
+}
+
+.auth-modal-close,
+.client-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.75rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.auth-modal-close:hover,
+.client-modal-close:hover {
+  color: var(--color-dark);
+  transform: scale(1.1);
+}
+
+.auth-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  background-color: #FAFAFA;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 0.875rem 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: var(--transition-standard);
+  font-family: var(--font-sans);
+}
+
+.auth-tab:hover {
+  color: var(--color-dark);
+}
+
+.auth-tab.active {
+  color: var(--color-dark);
+  border-bottom-color: var(--color-primary);
+  background-color: #FFFFFF;
+}
+
+.auth-form {
+  padding: 1.75rem;
+}
+
+.auth-alert {
+  margin: 1.25rem 1.75rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.auth-alert.alert-error {
+  background-color: #FFF2F0;
+  color: var(--color-error);
+  border: 1px solid #FFCCC7;
+}
+
+.auth-alert.alert-success {
+  background-color: #F6FFED;
+  color: #389E0D;
+  border: 1px solid #B7EB8F;
+}
+
+.auth-submit-btn {
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  font-size: 0.9375rem;
+  border-radius: var(--border-radius-pill);
+}
+
+.auth-switch-prompt {
+  margin-top: 1.25rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.auth-link-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.admin-auth-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  background-color: #FBF7F0;
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.775rem;
+  color: #725324;
+  margin-bottom: 1.25rem;
+  line-height: 1.45;
+}
+
+.admin-hint-text {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-text-light);
+  margin-top: 1rem;
+}
+
+.admin-hint-text code {
+  background-color: #F5F5F5;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--color-dark);
+}
+
+/* ── Client My Bookings Portal Modal ───────────────────────────────── */
+.client-brand-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(197, 168, 128, 0.15);
+  color: var(--color-primary-dark);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 4px;
+}
+
+.user-avatar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+}
+
+.client-modal-title {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-dark);
+  margin: 0;
+}
+
+.client-modal-subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: 2px 0 0;
+}
+
+.client-bookings-container {
+  padding: 1.5rem 1.75rem;
+  overflow-y: auto;
+  max-height: calc(85vh - 120px);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.client-booking-card {
+  background-color: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.client-booking-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.client-booking-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid rgba(232, 226, 216, 0.6);
+}
+
+.client-booking-id {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  letter-spacing: 0.04em;
+}
+
+.client-booking-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.client-booking-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.client-field-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.client-field-val {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-dark);
+}
+
+.client-booking-note {
+  background-color: var(--color-cream);
+  border-left: 3px solid var(--color-primary);
+  padding: 0.6rem 0.85rem;
+  border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-main);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+/* ── Admin Header Logout Button ────────────────────────────────────── */
+.btn-admin-logout {
+  background: rgba(217, 68, 54, 0.12);
+  color: var(--color-error);
+  border: 1px solid rgba(217, 68, 54, 0.3);
+  padding: 6px 12px;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.775rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-sans);
+}
+
+.btn-admin-logout:hover {
+  background-color: var(--color-error);
+  color: #FFFFFF;
 }
