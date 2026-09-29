@@ -157,16 +157,36 @@ document.addEventListener('DOMContentLoaded', () => {
     inputDate.min = `${yyyy}-${mm}-${dd}`;
   }
 
-  // Real-time slot availability check: disables already booked time slots for the selected date
-  function updateAvailableSlots() {
+  // Backend REST API Base URL
+  const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:5000/api'
+    : '/api';
+
+  // Real-time slot availability check: queries database API for booked slots on selected date
+  async function updateAvailableSlots() {
     if (!inputDate || !selectTime) return;
     const selectedDate = inputDate.value;
     if (!selectedDate) return;
 
-    const appointments = getStoredAppointments();
-    const bookedTimes = appointments
-      .filter(apt => apt.date === selectedDate && apt.status !== 'cancelled')
-      .map(apt => apt.time);
+    let bookedTimes = [];
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/slots/availability?date=${encodeURIComponent(selectedDate)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.success && Array.isArray(data.bookedSlots)) {
+          bookedTimes = data.bookedSlots;
+        }
+      } else {
+        throw new Error('API slot query failed');
+      }
+    } catch (err) {
+      // Local fallback if backend is offline
+      const appointments = getStoredAppointments();
+      bookedTimes = appointments
+        .filter(apt => apt.date === selectedDate && apt.status !== 'cancelled')
+        .map(apt => apt.time);
+    }
 
     const options = selectTime.querySelectorAll('option');
     options.forEach(opt => {
@@ -569,11 +589,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const kpiTotalRequests = document.getElementById('kpiTotalRequests');
   const kpiPendingRequests = document.getElementById('kpiPendingRequests');
+  const kpiReviewRequests = document.getElementById('kpiReviewRequests');
   const kpiConfirmedRequests = document.getElementById('kpiConfirmedRequests');
 
   const adminTabs = document.querySelectorAll('.admin-tab');
   const countTabAll = document.getElementById('countTabAll');
   const countTabPending = document.getElementById('countTabPending');
+  const countTabReview = document.getElementById('countTabReview');
   const countTabConfirmed = document.getElementById('countTabConfirmed');
   const countTabCancelled = document.getElementById('countTabCancelled');
 
@@ -692,8 +714,34 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --------------------------------------------------------------------------
-  // AUTH MODAL LOGIC & TAB SWITCHING
+  // AUTH MODAL LOGIC & TAB SWITCHING (WITH STRICT CREDENTIAL AUTO-CLEARING)
   // --------------------------------------------------------------------------
+  function clearAuthForms() {
+    if (adminLoginForm) adminLoginForm.reset();
+    if (clientLoginForm) clientLoginForm.reset();
+    if (clientSignupForm) clientSignupForm.reset();
+
+    // Explicitly wipe input values to defeat browser field memory & caching
+    const adminUserInp = document.getElementById('adminUsername');
+    const adminPassInp = document.getElementById('adminPassword');
+    if (adminUserInp) adminUserInp.value = '';
+    if (adminPassInp) adminPassInp.value = '';
+
+    const loginIdInp = document.getElementById('loginIdentifier');
+    const loginPassInp = document.getElementById('loginPassword');
+    if (loginIdInp) loginIdInp.value = '';
+    if (loginPassInp) loginPassInp.value = '';
+
+    const signNameInp = document.getElementById('signupName');
+    const signPhoneInp = document.getElementById('signupPhone');
+    const signEmailInp = document.getElementById('signupEmail');
+    const signPassInp = document.getElementById('signupPassword');
+    if (signNameInp) signNameInp.value = '';
+    if (signPhoneInp) signPhoneInp.value = '';
+    if (signEmailInp) signEmailInp.value = '';
+    if (signPassInp) signPassInp.value = '';
+  }
+
   function showAuthAlert(msg, type = 'error') {
     if (!authAlert) return;
     authAlert.textContent = msg;
@@ -709,6 +757,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function switchAuthTab(tabName) {
     clearAuthAlert();
+    clearAuthForms(); // Auto-clear inputs whenever switching between user/admin tabs
+
     const tabs = [tabBtnLogin, tabBtnSignup, tabBtnAdmin];
     tabs.forEach(t => {
       if (t) t.classList.remove('active');
@@ -739,6 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openAuthModal(tab = 'login') {
     if (!authModalOverlay) return;
+    clearAuthForms(); // Guarantee fresh, blank inputs upon opening
     switchAuthTab(tab);
     authModalOverlay.classList.add('show');
     authModalOverlay.setAttribute('aria-hidden', 'false');
@@ -747,10 +798,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function closeAuthModal() {
     if (!authModalOverlay) return;
+    clearAuthForms(); // Wipe all input fields immediately when modal is closed
+    clearAuthAlert();
     authModalOverlay.classList.remove('show');
     authModalOverlay.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
-    clearAuthAlert();
   }
 
   if (btnNavLogin) btnNavLogin.addEventListener('click', () => openAuthModal('login'));
@@ -772,66 +824,71 @@ document.addEventListener('DOMContentLoaded', () => {
   if (clientLoginForm) {
     clientLoginForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const identifier = document.getElementById('loginIdentifier').value.trim();
-      const password = document.getElementById('loginPassword').value.trim();
+      const nameInput = document.getElementById('loginIdentifier');
+      const passInput = document.getElementById('loginPassword');
+      const name = nameInput ? nameInput.value.trim() : '';
+      const password = passInput ? passInput.value.trim() : '';
 
-      if (!identifier || !password) {
-        showAuthAlert('Please enter your email/phone and password.');
+      if (!name || !password) {
+        showAuthAlert('Please enter your name and password.');
         return;
       }
 
       const users = getRegisteredUsers();
+      // Case-insensitive name match and exact password verification (with fallback to email/phone for older accounts)
       const user = users.find(u => 
-        (u.email.toLowerCase() === identifier.toLowerCase() || u.phone === identifier) && 
+        (((u.name && u.name.toLowerCase() === name.toLowerCase()) ||
+          (u.email && u.email.toLowerCase() === name.toLowerCase()) ||
+          (u.phone && u.phone === name))) && 
         u.password === password
       );
 
       if (user) {
         setCurrentUser(user);
+        clearAuthForms();
         closeAuthModal();
-        showAdminToast('Signed In ✓', `Welcome back, <strong>${user.name}</strong>!`);
+        showAdminToast('Signed In ✓', `Welcome back, <strong>${escapeHtml(user.name)}</strong>!`);
         openClientBookingsModal();
       } else {
-        showAuthAlert('Invalid credentials. If you are new, click "Create Account".');
+        if (passInput) passInput.value = '';
+        showAuthAlert('Invalid name or password. If you are new, click "Create Account".');
       }
     });
   }
 
-  // Client Sign Up Form Submit
+  // Client Sign Up Form Submit (Strictly Name & Password)
   if (clientSignupForm) {
     clientSignupForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const name = document.getElementById('signupName').value.trim();
-      const phone = document.getElementById('signupPhone').value.trim();
-      const email = document.getElementById('signupEmail').value.trim();
-      const password = document.getElementById('signupPassword').value.trim();
+      const nameInput = document.getElementById('signupName');
+      const passInput = document.getElementById('signupPassword');
+      const name = nameInput ? nameInput.value.trim() : '';
+      const password = passInput ? passInput.value.trim() : '';
 
-      if (!name || !phone || !email || !password) {
-        showAuthAlert('Please complete all required fields.');
+      if (!name || !password) {
+        showAuthAlert('Please enter both your name and password.');
         return;
       }
 
-      if (!isValidPhone(phone)) {
-        showAuthAlert('Please enter a valid 10-digit phone number.');
+      if (name.length < 2) {
+        showAuthAlert('Please enter a valid name (at least 2 characters).');
         return;
       }
 
-      if (!isValidEmail(email)) {
-        showAuthAlert('Please enter a valid email address.');
+      if (password.length < 4) {
+        showAuthAlert('Password must be at least 4 characters long.');
         return;
       }
 
       const users = getRegisteredUsers();
-      if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-        showAuthAlert('An account with this email already exists. Please log in.');
+      if (users.some(u => u.name && u.name.toLowerCase() === name.toLowerCase())) {
+        showAuthAlert('An account with this name already exists. Please log in.');
         return;
       }
 
       const newUser = {
         id: 'USR-' + Math.floor(1000 + Math.random() * 9000),
         name,
-        phone,
-        email,
         password,
         createdAt: new Date().toISOString()
       };
@@ -839,8 +896,9 @@ document.addEventListener('DOMContentLoaded', () => {
       users.push(newUser);
       saveRegisteredUsers(users);
       setCurrentUser(newUser);
+      clearAuthForms();
       closeAuthModal();
-      showAdminToast('Account Created ✓', `Welcome to Salon Hair Bride, <strong>${newUser.name}</strong>!`);
+      showAdminToast('Account Created ✓', `Welcome to Salon Hair Bride, <strong>${escapeHtml(newUser.name)}</strong>!`);
       openClientBookingsModal();
     });
   }
@@ -849,15 +907,23 @@ document.addEventListener('DOMContentLoaded', () => {
   if (adminLoginForm) {
     adminLoginForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const username = document.getElementById('adminUsername').value.trim();
-      const password = document.getElementById('adminPassword').value.trim();
+      const userInp = document.getElementById('adminUsername');
+      const passInp = document.getElementById('adminPassword');
+      const username = userInp ? userInp.value.trim() : '';
+      const password = passInp ? passInp.value.trim() : '';
 
       if (username === 'admin' && (password === 'admin123' || password === '1234')) {
         setAdminAuthenticated(true);
+        clearAuthForms(); // Auto-clear inputs immediately upon successful verification
         closeAuthModal();
         showAdminToast('Admin Authenticated ✓', 'Salon Live Dispatch Dashboard unlocked.');
         openAdminModal();
       } else {
+        // Clear password on failed attempt for security
+        if (passInp) {
+          passInp.value = '';
+          passInp.focus();
+        }
         showAuthAlert('Access Denied: Invalid Admin Credentials.');
       }
     });
@@ -867,12 +933,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnNavLogout) {
     btnNavLogout.addEventListener('click', () => {
       setCurrentUser(null);
+      clearAuthForms();
       showAdminToast('Signed Out', 'You have been logged out.');
     });
   }
 
   function handleAdminLogout() {
     setAdminAuthenticated(false);
+    clearAuthForms(); // Auto-clear admin credentials upon locking/logging out
     closeAdminModal();
     showAdminToast('Admin Locked', 'Admin session has been locked and signed out.');
   }
@@ -913,8 +981,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // STRICT PRIVACY: Filter ONLY appointments belonging to the logged-in client
     const userAppointments = allAppointments.filter(apt => 
       (apt.userId && apt.userId === user.id) ||
-      (apt.email && apt.email.toLowerCase() === user.email.toLowerCase()) ||
-      (apt.phone && apt.phone === user.phone)
+      (user.name && apt.name && apt.name.toLowerCase() === user.name.toLowerCase()) ||
+      (user.email && apt.email && apt.email.toLowerCase() === user.email.toLowerCase()) ||
+      (user.phone && apt.phone && apt.phone === user.phone)
     );
 
     if (userAppointments.length === 0) {
@@ -947,13 +1016,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clientBookingsList.innerHTML = userAppointments.map(apt => {
       const isPending = apt.status === 'pending';
+      const isReview = apt.status === 'review';
       const isConfirmed = apt.status === 'confirmed';
+      const isCancelled = apt.status === 'cancelled';
 
-      const statusBadge = isPending
-        ? '<span class="badge-status badge-pending"><span class="pulse-dot"></span> Awaiting Confirmation</span>'
-        : isConfirmed
-        ? '<span class="badge-status badge-confirmed">✓ Confirmed</span>'
-        : '<span class="badge-status badge-cancelled">Slot Unavailable</span>';
+      let statusBadge = '';
+      let statusTimelineHtml = '';
+      let cardStatusClass = 'status-pending';
+
+      if (isPending) {
+        cardStatusClass = 'status-pending';
+        statusBadge = '<span class="badge-status badge-pending"><span class="pulse-dot"></span> Pending</span>';
+        statusTimelineHtml = `
+          <div class="client-status-timeline timeline-pending">
+            <span class="timeline-dot"></span>
+            <span><strong>Pending:</strong> Awaiting salon review. Our team will review your requested slot shortly.</span>
+          </div>
+        `;
+      } else if (isReview) {
+        cardStatusClass = 'status-review';
+        statusBadge = '<span class="badge-status badge-review"><span class="pulse-dot"></span> Seen / Under Review</span>';
+        statusTimelineHtml = `
+          <div class="client-status-timeline timeline-review">
+            <span class="timeline-dot"></span>
+            <span><strong>Seen / Under Review:</strong> Stylist has viewed your booking request and is reviewing schedule availability.</span>
+          </div>
+        `;
+      } else if (isConfirmed) {
+        cardStatusClass = 'status-confirmed';
+        statusBadge = '<span class="badge-status badge-confirmed">✓ Approved / Confirmed</span>';
+        statusTimelineHtml = `
+          <div class="client-status-timeline timeline-confirmed">
+            <span class="timeline-dot"></span>
+            <span><strong>Approved / Confirmed:</strong> Your appointment is officially confirmed! Please arrive 5 minutes prior to your slot.</span>
+          </div>
+        `;
+      } else {
+        cardStatusClass = 'status-cancelled';
+        statusBadge = '<span class="badge-status badge-cancelled">✕ Rejected / Cancelled</span>';
+        statusTimelineHtml = `
+          <div class="client-status-timeline timeline-cancelled">
+            <span class="timeline-dot"></span>
+            <span><strong>Rejected / Cancelled:</strong> This appointment slot is unavailable. Please review the salon update or book another slot.</span>
+          </div>
+        `;
+      }
 
       const createdFormatted = new Date(apt.createdAt).toLocaleString([], {
         month: 'short',
@@ -963,7 +1070,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       return `
-        <div class="client-booking-card">
+        <div class="client-booking-card ${cardStatusClass}">
           <div class="client-booking-header">
             <span class="client-booking-id">#${apt.id} • Booked on ${createdFormatted}</span>
             <div>${statusBadge}</div>
@@ -993,6 +1100,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <div><strong>Salon Update:</strong> ${escapeHtml(apt.adminNote)}</div>
             </div>
           ` : ''}
+          ${statusTimelineHtml}
         </div>
       `;
     }).join('');
@@ -1050,6 +1158,21 @@ document.addEventListener('DOMContentLoaded', () => {
             adminNote: 'Confirmed! Master stylist Ryan assigned. Please arrive 5 minutes before your slot.',
             createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
             updatedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString()
+          },
+          {
+            id: 'APT-72314',
+            userId: 'USR-101',
+            name: 'Sarah Jenkins',
+            phone: '0771234567',
+            email: 'sarah@example.com',
+            service: 'Hair Coloring',
+            date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+            time: '11:15 AM - 12:00 PM',
+            message: 'Balayage touch up and toner consultation.',
+            status: 'review',
+            adminNote: 'Seen by Salon Manager. Stylist Priya is currently reviewing schedule availability.',
+            createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+            updatedAt: new Date(Date.now() - 1000 * 60 * 10).toISOString()
           }
         ];
         localStorage.setItem(APPOINTMENTS_STORAGE_KEY, JSON.stringify(initialSeed));
@@ -1234,14 +1357,28 @@ document.addEventListener('DOMContentLoaded', () => {
       if (salonNoteBody) {
         salonNoteBody.textContent = apt.adminNote || 'Confirmed! We look forward to welcoming you at Salon Hair Bride.';
       }
+    } else if (apt.status === 'review') {
+      if (formSuccessMessage) formSuccessMessage.classList.remove('is-confirmed');
+      if (feedbackStatusBadge) {
+        feedbackStatusBadge.className = 'feedback-status-pill status-review';
+        feedbackStatusBadge.removeAttribute('style');
+      }
+      if (feedbackStatusText) feedbackStatusText.textContent = 'Seen / Under Review';
+      if (feedbackTitle) feedbackTitle.textContent = 'Your appointment is Under Review!';
+      if (feedbackDetails) {
+        feedbackDetails.innerHTML = `Great news, <span>${apt.name}</span>! Our salon team has seen your request and is currently assigning stylist & schedule.`;
+      }
+      if (salonNoteContainer) salonNoteContainer.classList.add('has-note');
+      if (salonNoteBody) {
+        salonNoteBody.textContent = apt.adminNote || 'Stylist is reviewing your requested slot. You will receive final confirmation shortly.';
+      }
     } else if (apt.status === 'cancelled') {
       if (formSuccessMessage) formSuccessMessage.classList.remove('is-confirmed');
       if (feedbackStatusBadge) {
-        feedbackStatusBadge.className = 'feedback-status-pill status-pending';
-        feedbackStatusBadge.style.backgroundColor = '#FFF5F5';
-        feedbackStatusBadge.style.color = '#D94436';
+        feedbackStatusBadge.className = 'feedback-status-pill status-cancelled';
+        feedbackStatusBadge.removeAttribute('style');
       }
-      if (feedbackStatusText) feedbackStatusText.textContent = 'Slot Unavailable';
+      if (feedbackStatusText) feedbackStatusText.textContent = 'Slot Unavailable / Cancelled';
       if (feedbackTitle) feedbackTitle.textContent = 'Appointment Slot Unavailable';
       if (feedbackDetails) {
         feedbackDetails.innerHTML = `Dear <span>${apt.name}</span>, this slot could not be accommodated. Please see the salon note below.`;
@@ -1319,15 +1456,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const totalCount = list.length;
     const pendingCount = list.filter(i => i.status === 'pending').length;
+    const reviewCount = list.filter(i => i.status === 'review').length;
     const confirmedCount = list.filter(i => i.status === 'confirmed').length;
     const cancelledCount = list.filter(i => i.status === 'cancelled').length;
 
     if (kpiTotalRequests) kpiTotalRequests.textContent = totalCount;
     if (kpiPendingRequests) kpiPendingRequests.textContent = pendingCount;
+    if (kpiReviewRequests) kpiReviewRequests.textContent = reviewCount;
     if (kpiConfirmedRequests) kpiConfirmedRequests.textContent = confirmedCount;
 
     if (countTabAll) countTabAll.textContent = totalCount;
     if (countTabPending) countTabPending.textContent = pendingCount;
+    if (countTabReview) countTabReview.textContent = reviewCount;
     if (countTabConfirmed) countTabConfirmed.textContent = confirmedCount;
     if (countTabCancelled) countTabCancelled.textContent = cancelledCount;
 
@@ -1368,11 +1508,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     adminAppointmentsList.innerHTML = filtered.map(apt => {
       const isPending = apt.status === 'pending';
+      const isReview = apt.status === 'review';
       const isConfirmed = apt.status === 'confirmed';
       const isCancelled = apt.status === 'cancelled';
 
       const statusBadge = isPending
         ? '<span class="badge-status badge-pending"><span class="pulse-dot"></span> Pending</span>'
+        : isReview
+        ? '<span class="badge-status badge-review"><span class="pulse-dot"></span> Seen / Review</span>'
         : isConfirmed
         ? '<span class="badge-status badge-confirmed">✓ Confirmed</span>'
         : '<span class="badge-status badge-cancelled">Cancelled</span>';
@@ -1391,7 +1534,18 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="booking-card-id">#${apt.id}</span>
               <span class="booking-card-timestamp">${createdFormatted}</span>
             </div>
-            <div>${statusBadge}</div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <div class="admin-status-select-wrap">
+                <span class="admin-status-select-label">Status:</span>
+                <select class="admin-status-select" data-id="${apt.id}" aria-label="Change status for booking #${apt.id}">
+                  <option value="pending" ${isPending ? 'selected' : ''}>⏳ Pending</option>
+                  <option value="review" ${isReview ? 'selected' : ''}>👀 Seen / Review</option>
+                  <option value="confirmed" ${isConfirmed ? 'selected' : ''}>✓ Approved</option>
+                  <option value="cancelled" ${isCancelled ? 'selected' : ''}>✕ Rejected</option>
+                </select>
+              </div>
+              <div>${statusBadge}</div>
+            </div>
           </div>
 
           <div class="booking-card-body">
@@ -1428,6 +1582,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ${apt.adminNote ? `<p class="admin-current-note-display">"${escapeHtml(apt.adminNote)}"</p>` : ''}
             
             <div class="quick-presets-row">
+              <button type="button" class="preset-chip" data-note="Seen by Salon Manager. Stylist is reviewing schedule.">"Under Review"</button>
               <button type="button" class="preset-chip" data-note="Confirmed! Please arrive 10 minutes early.">"10 mins early"</button>
               <button type="button" class="preset-chip" data-note="Confirmed! Looking forward to seeing you.">"Looking forward"</button>
               <button type="button" class="preset-chip" data-note="Slot unavailable, please pick another date/time.">"Slot unavailable"</button>
@@ -1444,21 +1599,33 @@ document.addEventListener('DOMContentLoaded', () => {
           <!-- Card Actions Row -->
           <div class="booking-card-actions">
             <div class="card-actions-left">
+              ${isPending ? `
+                <button type="button" class="btn-admin-review" data-action="review" title="Mark as Seen and Under Review">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <span>Mark as Seen</span>
+                </button>
+              ` : ''}
+
               ${!isConfirmed ? `
-                <button type="button" class="btn-admin-confirm" data-action="confirm">
+                <button type="button" class="btn-admin-confirm" data-action="confirm" title="Approve &amp; Confirm Appointment">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                  <span>Confirm Appointment</span>
+                  <span>Approve</span>
                 </button>
               ` : `
                 <button type="button" class="btn-admin-action" data-action="re-pending" title="Mark back to pending">
                   <span>Revert to Pending</span>
                 </button>
               `}
+
               ${!isCancelled ? `
-                <button type="button" class="btn-admin-decline" data-action="cancel">
-                  Decline / Cancel
+                <button type="button" class="btn-admin-decline" data-action="cancel" title="Decline / Reject this slot">
+                  ✕ Reject / Cancel
                 </button>
-              ` : ''}
+              ` : `
+                <button type="button" class="btn-admin-action" data-action="re-pending" title="Reopen booking request">
+                  <span>Reopen Request</span>
+                </button>
+              `}
             </div>
             <div class="card-actions-right">
               <button type="button" class="btn-admin-action btn-danger-ghost" data-action="delete" title="Delete record">
@@ -1475,6 +1642,22 @@ document.addEventListener('DOMContentLoaded', () => {
       const aptId = card.getAttribute('data-id');
       const noteInput = card.querySelector('.admin-note-input');
 
+      // Status dropdown direct change
+      const statusSelect = card.querySelector('.admin-status-select');
+      if (statusSelect) {
+        statusSelect.addEventListener('change', (e) => {
+          const newSt = e.target.value;
+          let note = (noteInput && noteInput.value.trim()) ? noteInput.value.trim() : undefined;
+          if (!note) {
+            if (newSt === 'review') note = 'Seen by Salon Manager. Stylist is reviewing schedule.';
+            else if (newSt === 'confirmed') note = 'Confirmed! Looking forward to seeing you at Salon Hair Bride.';
+            else if (newSt === 'cancelled') note = 'Slot unavailable. Please pick another date or time slot.';
+          }
+          updateAppointmentStatus(aptId, newSt, note);
+          showAdminToast('Status Updated', `Booking #${aptId} status changed to ${newSt.toUpperCase()}.`);
+        });
+      }
+
       // Preset chips click
       card.querySelectorAll('.preset-chip').forEach(chip => {
         chip.addEventListener('click', () => {
@@ -1484,6 +1667,18 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
       });
+
+      // Mark as Seen / Review button
+      const reviewBtn = card.querySelector('[data-action="review"]');
+      if (reviewBtn) {
+        reviewBtn.addEventListener('click', () => {
+          const customNote = (noteInput && noteInput.value.trim())
+            ? noteInput.value.trim()
+            : 'Seen by Salon Manager. Stylist is reviewing schedule.';
+          updateAppointmentStatus(aptId, 'review', customNote);
+          showAdminToast('Marked as Seen ✓', `Booking #${aptId} is now Under Review.`);
+        });
+      }
 
       // Confirm button
       const confirmBtn = card.querySelector('[data-action="confirm"]');
@@ -1564,11 +1759,18 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    let readableStatus = 'Updated';
+    if (apt.status === 'review') readableStatus = 'Seen / Under Review';
+    else if (apt.status === 'confirmed') readableStatus = 'Approved / Confirmed';
+    else if (apt.status === 'cancelled') readableStatus = 'Rejected / Cancelled';
+    else if (apt.status === 'pending') readableStatus = 'Pending Salon Review';
+    else readableStatus = apt.status ? (apt.status.charAt(0).toUpperCase() + apt.status.slice(1)) : 'Updated';
+
     const templateParams = {
       customer_name : apt.name    || 'Valued Customer',
       booking_date  : apt.date    || 'N/A',
       time_slot     : apt.time    || 'N/A',
-      status        : apt.status  ? (apt.status.charAt(0).toUpperCase() + apt.status.slice(1)) : 'Updated',
+      status        : readableStatus,
       admin_note    : apt.adminNote || 'No additional notes.',
       email         : apt.email
     };
@@ -1584,7 +1786,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  function updateAppointmentStatus(id, newStatus, note) {
+  async function updateAppointmentStatus(id, newStatus, note) {
     const list = getStoredAppointments();
     const apt = list.find(item => item.id === id);
     if (apt) {
@@ -1601,12 +1803,27 @@ document.addEventListener('DOMContentLoaded', () => {
       syncActiveCustomerBooking();
       updateAvailableSlots();
 
+      // Async backend sync if available
+      try {
+        const token = sessionStorage.getItem('salon_admin_token') || localStorage.getItem('salon_auth_token');
+        await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(id)}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ status: newStatus, adminNote: apt.adminNote })
+        });
+      } catch (e) {
+        // Fallback gracefully to client state
+      }
+
       // Trigger EmailJS confirmation / status-update email to customer
       sendConfirmationEmail(apt);
     }
   }
 
-  function updateAppointmentNote(id, note) {
+  async function updateAppointmentNote(id, note) {
     const list = getStoredAppointments();
     const apt = list.find(item => item.id === id);
     if (apt) {
@@ -1617,10 +1834,22 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAdminDashboard();
       }
       syncActiveCustomerBooking();
+
+      try {
+        const token = sessionStorage.getItem('salon_admin_token') || localStorage.getItem('salon_auth_token');
+        await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(id)}/note`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ adminNote: note })
+        });
+      } catch (e) {}
     }
   }
 
-  function deleteAppointment(id) {
+  async function deleteAppointment(id) {
     const list = getStoredAppointments().filter(item => item.id !== id);
     saveAppointments(list, true);
     updateAdminBadges();
@@ -1629,6 +1858,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     syncActiveCustomerBooking();
     updateAvailableSlots();
+
+    try {
+      const token = sessionStorage.getItem('salon_admin_token') || localStorage.getItem('salon_auth_token');
+      await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+    } catch (e) {}
   }
 
   // Open & Close Admin Modal (REQUIRES ADMIN AUTHENTICATION)
