@@ -1,0 +1,28 @@
+=======================================================
+✅ Connected to MySQL Database [salon_db] via phpMyAdmin
+📍 Host: localhost | User: root
+=======================================================
+✅ Default services, admin account, and seed appointments verified.
+=======================================================
+✨ Salon Hair Bride Backend Server Running on Port: 5000
+🌐 API Base URL: http://localhost:5000/api
+🗄️ Database Target: MySQL [salon_db]
+=======================================================
+[Notify:booking_received APT-36138] ▶ Dispatching booking_received notification…
+[Email ⚠] Gmail App Password is not set in .env — skipping email notification.
+[Email ⚠] To enable: open .env and set GMAIL_APP_PASSWORD=<your 16-char Google App Password>
+[Notify:booking_received APT-36138] ⚠ Email failed: Email app password not configured
+[WhatsApp ▶] Phone formatting: "0774445555" → "94774445555" (SL country code applied)
+[WhatsApp ✗] UltraMsg API returned error: {
+  error: 'Your instance has been Stopped due to non-payment. you can activate this instance by extending your subscription. Payment information updates every 5 minutes.'
+}
+[Notify:booking_received APT-36138] ⚠ WhatsApp failed: {"error":"Your instance has been Stopped due to non-payment. you can activate this instance by extending your subscription. Payment information updates every 5 minutes."}
+[Notify:booking_received APT-40790] ▶ Dispatching booking_received notification…
+[Email ⚠] Gmail App Password is not set in .env — skipping email notification.
+[Email ⚠] To enable: open .env and set GMAIL_APP_PASSWORD=<your 16-char Google App Password>
+[Notify:booking_received APT-40790] ⚠ Email failed: Email app password not configured
+[WhatsApp ▶] Phone formatting: "0777777777777777777777777777777" → "94777777777777777777777777777777" (SL country code applied)
+[WhatsApp ✗] UltraMsg API returned error: {
+  error: 'Your instance has been Stopped due to non-payment. you can activate this instance by extending your subscription. Payment information updates every 5 minutes.'
+}
+[Notify:booking_received APT-40790] ⚠ WhatsApp failed: {"error":"Your instance has been Stopped due to non-payment. you can activate this instance by extending your subscription. Payment information updates every 5 minutes."}

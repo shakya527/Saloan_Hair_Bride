@@ -1,0 +1,11 @@
+=======================================================
+✅ Connected to MySQL Database [salon_db] via phpMyAdmin
+📍 Host: localhost | User: root
+=======================================================
+✅ Admin account password hash repaired (legacy/invalid hash replaced with a proper bcrypt hash for admin123).
+✅ Default services, admin account, and seed appointments verified.
+=======================================================
+✨ Salon Hair Bride Backend Server Running on Port: 5000
+🌐 API Base URL: http://localhost:5000/api
+🗄️ Database Target: MySQL [salon_db]
+=======================================================

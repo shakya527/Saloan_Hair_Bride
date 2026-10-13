@@ -895,8 +895,8 @@
 
 
     <!-- 9. CONTACT SECTION -->
-    <section class="contact-section" id="contact">
-      <div class="container">
+    <section class="contact-section section-above-map" id="contact">
+      <div class="container contact-container">
         <div class="section-header text-center">
           <div class="section-label">Visit & Connect</div>
           <h2 class="section-heading">Contact Salon Hair Bird</h2>
@@ -980,25 +980,23 @@
             </div>
           </div>
 
-          <!-- Google Maps Embed Placeholder -->
-          <div class="contact-map-wrapper">
-            <div class="map-container">
-              <iframe 
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d63371.8153629472!2d79.8211859!3d6.9218386!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ae253d10f7a7003%3A0x320b2e4d32d3838d!2sColombo%2C%20Sri%20Lanka!5e0!3m2!1sen!2slk!4v1700000000000!5m2!1sen!2slk" 
-                title="Salon Hair Bird Location Map in Colombo, Sri Lanka" 
-                width="100%" 
-                height="100%" 
-                style="border:0;" 
-                allowfullscreen="" 
-                loading="lazy" 
-                referrerpolicy="no-referrer-when-downgrade">
-              </iframe>
-              <div class="map-card-overlay">
-                <span class="map-pin-pulse"></span>
-                <div>
-                  <strong>Salon Hair Bird</strong>
-                  <p>Colombo, Sri Lanka</p>
-                </div>
+          <!-- Google Maps Embed -->
+          <div class="map-container" style="position:relative;width:100%;height:450px;background:transparent;border:none;box-shadow:none;padding:0;margin:0;overflow:hidden;">
+            <iframe 
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d63371.8153629472!2d79.8211859!3d6.9218386!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ae253d10f7a7003%3A0x320b2e4d32d3838d!2sColombo%2C%20Sri%20Lanka!5e0!3m2!1sen!2slk!4v1700000000000!5m2!1sen!2slk" 
+              title="Salon Hair Bird Location Map in Colombo, Sri Lanka" 
+              width="100%" 
+              height="450" 
+              style="border:0;display:block;width:100%;height:450px;" 
+              allowfullscreen="" 
+              loading="lazy" 
+              referrerpolicy="no-referrer-when-downgrade">
+            </iframe>
+            <div class="map-card-overlay map-info-card">
+              <span class="map-pin-pulse"></span>
+              <div>
+                <strong>Salon Hair Bird</strong>
+                <p>123 Colombo Street, Colombo 07<br/>Phone: <a href="tel:0771234567">077 123 4567</a></p>
               </div>
             </div>
           </div>
@@ -1057,6 +1055,7 @@
             <li><a href="#gallery">Gallery</a></li>
             <li><a href="#testimonials">Testimonials</a></li>
             <li><a href="#contact">Contact</a></li>
+            <li><a href="#" id="footerRateVisitLink">Rate Your Visit ⭐</a></li>
           </ul>
         </div>
 
@@ -1291,6 +1290,19 @@
         </div>
       </div>
 
+      <!-- Admin Section Navigation (Appointments / Stylists / Services / Analytics / Feedback / Waiting List) -->
+      <div class="admin-section-nav" id="adminSectionNav" role="tablist" aria-label="Admin dashboard sections">
+        <button type="button" class="admin-section-btn active" data-section="appointments" role="tab" aria-selected="true">Appointments</button>
+        <button type="button" class="admin-section-btn" data-section="stylists" role="tab" aria-selected="false">Stylists</button>
+        <button type="button" class="admin-section-btn" data-section="services" role="tab" aria-selected="false">Services</button>
+        <button type="button" class="admin-section-btn" data-section="analytics" role="tab" aria-selected="false">Analytics</button>
+        <button type="button" class="admin-section-btn" data-section="feedback" role="tab" aria-selected="false">Feedback</button>
+        <button type="button" class="admin-section-btn" data-section="waiting-list" id="adminTabWaitingList" role="tab" aria-selected="false">Waiting List</button>
+        <button type="button" class="admin-section-btn" data-section="clients" id="adminTabClients" role="tab" aria-selected="false">Clients</button>
+      </div>
+
+      <!-- SECTION: APPOINTMENTS (existing dispatch dashboard) -->
+      <div class="admin-section active" id="adminSectionAppointments" role="tabpanel">
       <!-- Admin Stats KPI Ribbon -->
       <div class="admin-kpi-ribbon">
         <div class="admin-kpi-card" data-kpi="total">
@@ -1339,6 +1351,240 @@
       <div class="admin-appointments-container" id="adminAppointmentsList">
         <!-- Rendered dynamically by JavaScript -->
       </div>
+      </div><!-- /SECTION: APPOINTMENTS -->
+
+      <!-- SECTION: STYLIST DIRECTORY (rendered by admin-panel.js) -->
+      <div class="admin-section" id="adminSectionStylists" role="tabpanel" hidden>
+        <div class="admin-panel-body" id="stylistsPanel">
+          <p class="admin-panel-loading">Loading stylist directory…</p>
+        </div>
+      </div>
+
+      <!-- SECTION: SERVICE MENU & PRICING (rendered by admin-panel.js) -->
+      <div class="admin-section" id="adminSectionServices" role="tabpanel" hidden>
+        <div class="admin-panel-body" id="servicesPanel">
+          <p class="admin-panel-loading">Loading service menu…</p>
+        </div>
+      </div>
+
+      <!-- SECTION: REVENUE & BUSINESS ANALYTICS (rendered by admin-panel.js) -->
+      <div class="admin-section" id="adminSectionAnalytics" role="tabpanel" hidden>
+        <div class="admin-panel-body" id="analyticsPanel">
+          <p class="admin-panel-loading">Loading analytics…</p>
+        </div>
+      </div>
+
+      <!-- SECTION: CLIENT FEEDBACK & RATINGS (rendered by admin-panel.js) -->
+      <div class="admin-section" id="adminSectionFeedback" role="tabpanel" hidden>
+        <div class="admin-panel-body" id="feedbackPanel">
+          <p class="admin-panel-loading">Loading feedback…</p>
+        </div>
+      </div>
+
+      <!-- SECTION: SMART WAITING LIST (rendered by admin-panel.js) -->
+      <div class="admin-section" id="adminSectionWaitingList" role="tabpanel" hidden>
+        <div class="admin-panel-body" id="waitingListPanel">
+          <p class="admin-panel-loading">Loading waiting list…</p>
+        </div>
+      </div>
+
+      <!-- SECTION: CLIENTS MANAGEMENT (rendered by admin-panel.js) -->
+      <div class="admin-section" id="adminSectionClients" role="tabpanel" hidden>
+        <div class="admin-panel-body" id="clientsPanel">
+          <p class="admin-panel-loading">Loading clients directory…</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       CLIENT SERVICE HISTORY MODAL / DRAWER (Admin View)
+       ========================================================================= -->
+  <div class="client-modal-overlay client-history-modal-overlay" id="clientHistoryModalOverlay" role="dialog" aria-modal="true" aria-labelledby="clientHistoryModalTitle" aria-hidden="true" style="z-index: 10000;">
+    <div class="client-modal client-history-modal" style="max-width: 860px; width: 95%;">
+      <div class="client-modal-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div class="client-header-title-wrap">
+          <div class="client-brand-pill">
+            <span class="user-avatar-dot" style="background: #2563EB;"></span>
+            <span>CLIENT PROFILE &amp; CRM</span>
+          </div>
+          <h2 class="client-modal-title" id="clientHistoryModalTitle">Client Service History</h2>
+          <p class="client-modal-subtitle" id="clientHistoryModalSubtitle">Complete appointment and service records</p>
+        </div>
+        <div class="client-header-controls">
+          <button type="button" class="client-modal-close" id="clientHistoryModalClose" aria-label="Close client history modal">&times;</button>
+        </div>
+      </div>
+      <div class="client-history-modal-body" id="clientHistoryModalBody" style="padding: 1.5rem; max-height: calc(85vh - 120px); overflow-y: auto;">
+        <p class="admin-panel-loading">Loading client history…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       INVOICE / RECEIPT MODAL (Printable / Downloadable)
+       ========================================================================= -->
+  <div class="client-modal-overlay invoice-modal-overlay" id="invoiceModalOverlay" role="dialog" aria-modal="true" aria-labelledby="invoiceModalTitle" aria-hidden="true" style="z-index: 10050;">
+    <div class="client-modal invoice-modal" style="max-width: 650px; width: 95%;">
+      <div class="client-modal-header no-print" style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div class="client-header-title-wrap">
+          <div class="client-brand-pill">
+            <span class="user-avatar-dot" style="background: #10B981;"></span>
+            <span>OFFICIAL RECEIPT</span>
+          </div>
+          <h2 class="client-modal-title" id="invoiceModalTitle">Invoice &amp; Receipt</h2>
+          <p class="client-modal-subtitle">Salon Hair Bird official billing statement</p>
+        </div>
+        <div class="client-header-controls" style="display: flex; gap: 8px; align-items: center;">
+          <button type="button" class="btn btn-outline btn-sm btn-print-invoice" id="invoicePrintBtn" title="Print or save as PDF">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 4px;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            Print
+          </button>
+          <button type="button" class="btn btn-primary btn-sm btn-download-invoice" id="invoiceDownloadBtn" title="Download receipt text file">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Download
+          </button>
+          <button type="button" class="client-modal-close" id="invoiceModalClose" aria-label="Close invoice modal">&times;</button>
+        </div>
+      </div>
+      <div class="invoice-modal-body" id="invoiceModalBody" style="padding: 1.5rem; max-height: calc(85vh - 100px); overflow-y: auto;">
+        <!-- Dynamic invoice content rendered here -->
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =========================================================================
+       PUBLIC CLIENT FEEDBACK MODAL — "RATE YOUR VISIT" (star rating + notes)
+       ========================================================================= -->
+  <div id="review-section"></div>
+  <div class="client-modal-overlay feedback-modal-overlay" id="feedbackModalOverlay" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle" aria-hidden="true">
+    <div class="client-modal feedback-modal">
+      <div class="client-modal-header">
+        <div class="client-header-title-wrap">
+          <div class="client-brand-pill">
+            <span class="user-avatar-dot"></span>
+            <span>CLIENT EXPERIENCE</span>
+          </div>
+          <h2 class="client-modal-title" id="feedbackModalTitle">Rate Your Experience</h2>
+          <p class="client-modal-subtitle">Tell us how we did — your feedback helps us serve you better.</p>
+        </div>
+        <div class="client-header-controls">
+          <button type="button" class="client-modal-close" id="feedbackModalClose" aria-label="Close feedback form">&times;</button>
+        </div>
+      </div>
+
+      <form class="feedback-form" id="publicFeedbackForm" novalidate>
+        <div class="feedback-prefill-badge" id="fbPrefillBadge" style="display:none;margin-bottom:14px;padding:9px 14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;color:#065f46;font-size:0.875rem;"></div>
+        <div class="form-group">
+          <label for="fbBookingCode" class="form-label">Booking Code <span class="required">*</span></label>
+          <input type="text" id="fbBookingCode" class="form-input" placeholder="e.g. APT-98241" autocomplete="off" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" id="fbRatingLabel">Your Star Rating <span class="required">*</span></label>
+          <div class="star-rating-input" id="starRatingInput" role="radiogroup" aria-labelledby="fbRatingLabel">
+            <button type="button" class="star-btn" data-value="1" role="radio" aria-checked="false" aria-label="1 star">★</button>
+            <button type="button" class="star-btn" data-value="2" role="radio" aria-checked="false" aria-label="2 stars">★</button>
+            <button type="button" class="star-btn" data-value="3" role="radio" aria-checked="false" aria-label="3 stars">★</button>
+            <button type="button" class="star-btn" data-value="4" role="radio" aria-checked="false" aria-label="4 stars">★</button>
+            <button type="button" class="star-btn" data-value="5" role="radio" aria-checked="false" aria-label="5 stars">★</button>
+          </div>
+          <input type="hidden" id="fbRatingValue" value="">
+        </div>
+
+        <div class="form-group">
+          <label for="fbNotes" class="form-label">Feedback Notes <span class="optional-tag">(optional)</span></label>
+          <textarea id="fbNotes" class="form-input feedback-textarea" rows="4" placeholder="What did you love? What can we improve?"></textarea>
+        </div>
+
+        <div class="feedback-form-alert" id="feedbackFormAlert" role="alert" style="display:none;"></div>
+
+        <button type="submit" class="btn btn-primary btn-block auth-submit-btn" id="fbSubmitBtn">
+          <span>Submit My Review</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       SMART WAITING LIST MODAL — "JOIN WAITING LIST" (Fully Booked Slots Queue)
+       ========================================================================= -->
+  <div class="client-modal-overlay waiting-list-modal-overlay" id="waitingListModalOverlay" role="dialog" aria-modal="true" aria-labelledby="waitingListModalTitle" aria-hidden="true">
+    <div class="client-modal waiting-list-modal">
+      <div class="client-modal-header">
+        <div class="client-header-title-wrap">
+          <div class="client-brand-pill">
+            <span class="user-avatar-dot" style="background:#D4AF37;"></span>
+            <span>SMART WAITING LIST</span>
+          </div>
+          <h2 class="client-modal-title" id="waitingListModalTitle">Join Priority Waiting List</h2>
+          <p class="client-modal-subtitle">This slot is fully booked. Join our priority queue to automatically claim the spot the instant a cancellation occurs!</p>
+        </div>
+        <div class="client-header-controls">
+          <button type="button" class="client-modal-close" id="waitingListModalClose" aria-label="Close waiting list form">&times;</button>
+        </div>
+      </div>
+
+      <form class="waiting-list-form" id="publicWaitingListForm" novalidate style="padding: 1.5rem;">
+        <div class="form-row" style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1;">
+            <label for="wlClientName" class="form-label">Full Name <span class="required">*</span></label>
+            <input type="text" id="wlClientName" class="form-input" placeholder="Your full name" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="wlClientPhone" class="form-label">Phone Number <span class="required">*</span></label>
+            <input type="tel" id="wlClientPhone" class="form-input" placeholder="07XXXXXXXX" required>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px;">
+          <label for="wlClientEmail" class="form-label">Email Address <span class="optional-tag">(optional, for confirmation &amp; slot-opened alert)</span></label>
+          <input type="email" id="wlClientEmail" class="form-input" placeholder="you@example.com">
+        </div>
+
+        <div class="form-row" style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1;">
+            <label for="wlPrefDate" class="form-label">Preferred Date <span class="required">*</span></label>
+            <input type="date" id="wlPrefDate" class="form-input" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="wlPrefSlot" class="form-label">Requested Time Slot <span class="required">*</span></label>
+            <input type="text" id="wlPrefSlot" class="form-input" placeholder="e.g. 10:30 AM - 11:15 AM" required>
+          </div>
+        </div>
+
+        <div class="form-row" style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1;">
+            <label for="wlServiceName" class="form-label">Requested Service <span class="optional-tag">(optional)</span></label>
+            <select id="wlServiceName" class="form-input form-select">
+              <option value="">Any / General Styling</option>
+              <option value="Bridal Styling">Bridal Styling</option>
+              <option value="Hair Cut">Hair Cut</option>
+              <option value="Hair Coloring">Hair Coloring</option>
+              <option value="Hair Treatment">Hair Treatment</option>
+              <option value="Facial &amp; Beauty Care">Facial &amp; Beauty Care</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="wlStylistSelect" class="form-label">Stylist Preference <span class="optional-tag">(optional)</span></label>
+            <select id="wlStylistSelect" class="form-input form-select">
+              <option value="">Any Available Stylist</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label for="wlNotes" class="form-label">Special Requests / Flexibility <span class="optional-tag">(optional)</span></label>
+          <textarea id="wlNotes" class="form-input" rows="2" placeholder="Tell us if you are flexible with earlier or later slots..."></textarea>
+        </div>
+
+        <div class="feedback-form-alert" id="waitingListFormAlert" role="alert" style="display:none; margin-bottom:14px;"></div>
+
+        <button type="submit" class="btn btn-primary btn-block auth-submit-btn" id="wlSubmitBtn" style="width:100%;">
+          <span>Join Priority Waiting List</span>
+        </button>
+      </form>
     </div>
   </div>
 
@@ -1359,5 +1605,9 @@
 
   <!-- Main JavaScript File -->
   <script src="script.js"></script>
+
+  <!-- Admin Extension Panels: Stylists / Services / Analytics / Feedback + Public Review Modal -->
+  <script src="admin-panel.js"></script>
 </body>
 </html>
+

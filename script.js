@@ -157,8 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
     inputDate.min = `${yyyy}-${mm}-${dd}`;
   }
 
-  // Backend REST API Base URL
-  const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  // Backend REST API Base URL (file:// support included so the admin login
+  // works even when index.html is opened directly from disk)
+  const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:')
     ? 'http://localhost:5000/api'
     : '/api';
 
@@ -197,18 +198,78 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (bookedTimes.includes(baseTime)) {
-        opt.disabled = true;
-        opt.textContent = `${baseTime} (Booked / Unavailable)`;
-        opt.style.color = '#999999';
-        opt.style.backgroundColor = '#F5F5F5';
-        if (selectTime.value === baseTime) {
-          selectTime.value = '';
-        }
+        opt.disabled = false;
+        opt.setAttribute('data-booked', 'true');
+        opt.textContent = `${baseTime} (Fully Booked — Join Waiting List)`;
+        opt.style.color = '#B45309';
+        opt.style.backgroundColor = '#FEF3C7';
+        opt.style.fontWeight = '600';
       } else {
         opt.disabled = false;
+        opt.removeAttribute('data-booked');
         opt.textContent = baseTime;
         opt.style.color = '';
         opt.style.backgroundColor = '';
+        opt.style.fontWeight = '';
+      }
+    });
+
+    // Dynamic banner below time slot selector when booked slots exist
+    let wlNotice = document.getElementById('waitingListSlotNotice');
+    if (!wlNotice && selectTime && selectTime.parentNode) {
+      wlNotice = document.createElement('div');
+      wlNotice.id = 'waitingListSlotNotice';
+      wlNotice.className = 'waiting-list-slot-notice';
+      selectTime.parentNode.parentNode.appendChild(wlNotice);
+    }
+    if (wlNotice) {
+      if (bookedTimes.length > 0) {
+        wlNotice.style.display = 'block';
+        wlNotice.innerHTML = `
+          <div class="wl-notice-badge">
+            <span class="wl-notice-dot"></span>
+            <span>Looking for a fully booked slot? <button type="button" class="btn-link-wl" id="btnOpenWlModal">Join Priority Waiting List</button></span>
+          </div>
+        `;
+        const btnWl = wlNotice.querySelector('#btnOpenWlModal');
+        if (btnWl) {
+          btnWl.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (typeof openWaitingListModal === 'function') {
+              openWaitingListModal({
+                date: selectedDate,
+                slot: bookedTimes[0] || '',
+                serviceName: selectService ? selectService.value : '',
+                name: inputName ? inputName.value.trim() : '',
+                phone: inputPhone ? inputPhone.value.trim() : '',
+                email: inputEmail ? inputEmail.value.trim() : ''
+              });
+            }
+          });
+        }
+      } else {
+        wlNotice.style.display = 'none';
+      }
+    }
+  }
+
+  if (selectTime) {
+    selectTime.addEventListener('change', () => {
+      const selectedOpt = selectTime.options[selectTime.selectedIndex];
+      if (selectedOpt && selectedOpt.getAttribute('data-booked') === 'true') {
+        const baseTime = selectedOpt.getAttribute('data-base-time') || selectedOpt.value;
+        const curDate = inputDate ? inputDate.value : '';
+        if (typeof openWaitingListModal === 'function') {
+          openWaitingListModal({
+            date: curDate,
+            slot: baseTime,
+            serviceName: selectService ? selectService.value : '',
+            name: inputName ? inputName.value.trim() : '',
+            phone: inputPhone ? inputPhone.value.trim() : '',
+            email: inputEmail ? inputEmail.value.trim() : ''
+          });
+        }
+        selectTime.value = '';
       }
     });
   }
@@ -663,18 +724,102 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function isAdminAuthenticated() {
     try {
-      return sessionStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === 'true';
+      return sessionStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === 'true' ||
+             localStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === 'true';
     } catch (e) {
       return false;
     }
   }
 
+  // --------------------------------------------------------------------------
+  // STRICT ADMIN SESSION ENFORCEMENT
+  // A valid backend JWT (sessionStorage 'salon_admin_token') is the single
+  // source of truth. Missing / malformed / expired / non-admin tokens purge
+  // the session and redirect straight to the Admin Login screen.
+  // --------------------------------------------------------------------------
+  const ADMIN_TOKEN_KEY = 'salon_admin_token';
+
+  function getAdminApiToken() {
+    try {
+      return sessionStorage.getItem(ADMIN_TOKEN_KEY) || localStorage.getItem(ADMIN_TOKEN_KEY);
+    } catch (e) { return null; }
+  }
+
+  function storeAdminApiToken(token) {
+    try {
+      sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+      localStorage.setItem(ADMIN_TOKEN_KEY, token);
+    } catch (e) {}
+  }
+
+  function isAdminTokenValid(token) {
+    if (!token || typeof token !== 'string') return false;
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    try {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (payload.role !== 'admin') return false;
+      if (payload.exp && payload.exp * 1000 <= Date.now()) return false;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function clearAdminSession() {
+    try {
+      sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+      localStorage.removeItem(ADMIN_TOKEN_KEY);
+      localStorage.removeItem('salon_auth_token'); // legacy key cleanup
+    } catch (e) {}
+    setAdminAuthenticated(false);
+  }
+
+  // Verifies the admin session; on failure clears everything and (optionally)
+  // redirects to the login screen demanding credentials. Returns validity.
+  function enforceAdminSession(redirectToLogin) {
+    if (isAdminAuthenticated() && isAdminTokenValid(getAdminApiToken())) return true;
+
+    const wasAdmin = isAdminAuthenticated();
+    clearAdminSession();
+    closeAdminModal();
+
+    if (redirectToLogin) {
+      openAuthModal('admin');
+      showAuthAlert(
+        wasAdmin
+          ? 'Admin session expired or invalid. Please enter your credentials to continue.'
+          : 'Restricted area. Admin authentication required — please enter your credentials.',
+        'error'
+      );
+    } else if (wasAdmin) {
+      showAdminToast('Admin Session Ended', 'Session token was missing or expired. Please sign in again.');
+    }
+    return false;
+  }
+
+  // Any component (e.g. admin-panel.js) can signal a rejected token (401/403)
+  window.addEventListener('salon:admin_session_invalid', () => enforceAdminSession(true));
+
+  // Purge stale admin sessions on page load, then re-check every minute so an
+  // expired token can never keep the dashboard alive in an open tab.
+  if (isAdminAuthenticated() && !isAdminTokenValid(getAdminApiToken())) {
+    clearAdminSession();
+  }
+  setInterval(() => {
+    if (isAdminAuthenticated() && !isAdminTokenValid(getAdminApiToken())) {
+      enforceAdminSession(true);
+    }
+  }, 60 * 1000);
+
   function setAdminAuthenticated(val) {
     try {
       if (val) {
         sessionStorage.setItem(ADMIN_AUTH_STORAGE_KEY, 'true');
+        localStorage.setItem(ADMIN_AUTH_STORAGE_KEY, 'true');
       } else {
         sessionStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+        localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
       }
       updateNavAuthState();
     } catch (e) {}
@@ -903,28 +1048,48 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Admin Login Form Submit
+  // Admin Login Form Submit — STRICT: the backend must issue a valid admin JWT
+  // before the dashboard unlocks. No token, no session.
   if (adminLoginForm) {
-    adminLoginForm.addEventListener('submit', (e) => {
+    adminLoginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const userInp = document.getElementById('adminUsername');
       const passInp = document.getElementById('adminPassword');
+      const submitBtn = adminLoginForm.querySelector('button[type="submit"]');
       const username = userInp ? userInp.value.trim() : '';
       const password = passInp ? passInp.value.trim() : '';
 
-      if (username === 'admin' && (password === 'admin123' || password === '1234')) {
-        setAdminAuthenticated(true);
-        clearAuthForms(); // Auto-clear inputs immediately upon successful verification
-        closeAuthModal();
-        showAdminToast('Admin Authenticated ✓', 'Salon Live Dispatch Dashboard unlocked.');
-        openAdminModal();
-      } else {
-        // Clear password on failed attempt for security
-        if (passInp) {
-          passInp.value = '';
-          passInp.focus();
+      if (!username || !password) {
+        showAuthAlert('Please enter your admin username and password.');
+        return;
+      }
+
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        const resp = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: username, password })
+        });
+        const data = await resp.json().catch(() => null);
+
+        if (resp.ok && data && data.success && data.token && data.user && data.user.role === 'admin' && isAdminTokenValid(data.token)) {
+          storeAdminApiToken(data.token);
+          setAdminAuthenticated(true);
+          clearAuthForms(); // Auto-clear inputs immediately upon successful verification
+          closeAuthModal();
+          showAdminToast('Admin Authenticated ✓', 'Salon Live Dispatch Dashboard unlocked.');
+          window.dispatchEvent(new CustomEvent('salon:admin_token_ready'));
+          openAdminModal();
+        } else {
+          if (passInp) passInp.value = '';
+          showAuthAlert((data && data.message) || 'Access Denied: Invalid Admin Credentials.');
         }
-        showAuthAlert('Access Denied: Invalid Admin Credentials.');
+      } catch (err) {
+        if (passInp) passInp.value = '';
+        showAuthAlert('Cannot reach the salon server. Verify the backend is running, then try again.');
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
       }
     });
   }
@@ -939,7 +1104,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handleAdminLogout() {
-    setAdminAuthenticated(false);
+    clearAdminSession();
     clearAuthForms(); // Auto-clear admin credentials upon locking/logging out
     closeAdminModal();
     showAdminToast('Admin Locked', 'Admin session has been locked and signed out.');
@@ -1018,6 +1183,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const isPending = apt.status === 'pending';
       const isReview = apt.status === 'review';
       const isConfirmed = apt.status === 'confirmed';
+      const isCompleted = apt.status === 'completed';
       const isCancelled = apt.status === 'cancelled';
 
       let statusBadge = '';
@@ -1049,6 +1215,15 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="client-status-timeline timeline-confirmed">
             <span class="timeline-dot"></span>
             <span><strong>Approved / Confirmed:</strong> Your appointment is officially confirmed! Please arrive 5 minutes prior to your slot.</span>
+          </div>
+        `;
+      } else if (isCompleted) {
+        cardStatusClass = 'status-confirmed';
+        statusBadge = '<span class="badge-status badge-confirmed" style="background:#d1fae5;color:#065f46;border-color:#a7f3d0;">✅ Visit Completed</span>';
+        statusTimelineHtml = `
+          <div class="client-status-timeline timeline-confirmed" style="border-left-color:#10b981;">
+            <span class="timeline-dot" style="background:#10b981;"></span>
+            <span><strong>Visit Completed:</strong> Thank you for visiting us! We hope you loved your service. Please share your rating and feedback below.</span>
           </div>
         `;
       } else {
@@ -1101,9 +1276,81 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           ` : ''}
           ${statusTimelineHtml}
+          <div style="margin-top: 0.85rem; padding-top: 0.65rem; border-top: 1px dashed rgba(197, 168, 128, 0.35); display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+            ${isCompleted ? `
+              <button type="button" class="btn-client-view-invoice btn-client-rate-visit" data-booking="${escapeHtml(apt.id)}">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="none" style="vertical-align: -1px; margin-right: 4px;">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+                Rate Your Visit
+              </button>
+            ` : ''}
+            <button type="button" class="btn-client-view-invoice" data-booking="${escapeHtml(apt.id)}">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -1px; margin-right: 4px;">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+              </svg>
+              View Invoice / Receipt
+            </button>
+          </div>
         </div>
       `;
     }).join('');
+
+    // Attach click listeners for Rate Visit buttons in client portal
+    clientBookingsList.querySelectorAll('.btn-client-rate-visit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bookingId = btn.getAttribute('data-booking');
+        closeClientBookingsModal();
+        if (typeof window.openFeedbackModal === 'function') {
+          window.openFeedbackModal(bookingId);
+        } else {
+          window.location.hash = '#review-section?code=' + encodeURIComponent(bookingId);
+        }
+      });
+    });
+
+    // Attach click listeners for View Invoice buttons in client portal
+    clientBookingsList.querySelectorAll('.btn-client-view-invoice').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bookingId = btn.getAttribute('data-booking');
+        const apt = userAppointments.find(a => String(a.id) === String(bookingId));
+        if (apt) {
+          const priceMap = {
+            'Bridal Styling': 15000,
+            'Hair Coloring': 6500,
+            'Hair Cut': 2500,
+            'Hair Treatment': 4800,
+            'Hair Styling': 3500,
+            'Facial & Beauty Care': 4200
+          };
+          const invoiceData = {
+            salon: {
+              name: 'Salon Hair Bird',
+              address: '123 Colombo Street, Colombo 07, Sri Lanka',
+              phone: '077 123 4567',
+              email: 'info@salonhairbird.com'
+            },
+            invoiceId: apt.id ? (String(apt.id).startsWith('INV-') ? String(apt.id) : `INV-${String(apt.id).replace(/^#/, '')}`) : `INV-${Date.now()}`,
+            clientName: apt.name || (user && user.name) || 'Valued Customer',
+            clientPhone: apt.phone || (user && user.phone) || '—',
+            clientEmail: apt.email || (user && user.email) || '—',
+            serviceName: apt.service || 'General Styling',
+            price: apt.price || priceMap[apt.service] || 3500,
+            date: apt.date || '—',
+            timeSlot: apt.time || '—',
+            stylistName: apt.stylistName || 'Salon Specialist',
+            status: apt.status ? apt.status.toUpperCase() : 'CONFIRMED',
+            notes: apt.message || ''
+          };
+          if (typeof window.openInvoiceModal === 'function') {
+            window.openInvoiceModal(invoiceData);
+          }
+        }
+      });
+    });
   }
 
   if (btnNavMyBookings) btnNavMyBookings.addEventListener('click', openClientBookingsModal);
@@ -1122,6 +1369,234 @@ document.addEventListener('DOMContentLoaded', () => {
       if (aptSection) aptSection.scrollIntoView({ behavior: 'smooth' });
     });
   }
+
+  // --------------------------------------------------------------------------
+  // INVOICE / RECEIPT GENERATION & MODAL (PRINTABLE / DOWNLOADABLE)
+  // --------------------------------------------------------------------------
+  const invoiceModalOverlay = document.getElementById('invoiceModalOverlay');
+  const invoiceModalClose = document.getElementById('invoiceModalClose');
+  const invoiceModalBody = document.getElementById('invoiceModalBody');
+  const invoicePrintBtn = document.getElementById('invoicePrintBtn');
+  const invoiceDownloadBtn = document.getElementById('invoiceDownloadBtn');
+
+  let currentInvoiceData = null;
+
+  function closeInvoiceModal() {
+    if (!invoiceModalOverlay) return;
+    invoiceModalOverlay.classList.remove('show');
+    invoiceModalOverlay.setAttribute('aria-hidden', 'true');
+    const clientHistory = document.getElementById('clientHistoryModalOverlay');
+    const clientBookings = document.getElementById('clientBookingsModalOverlay');
+    if ((clientHistory && clientHistory.classList.contains('show')) ||
+        (clientBookings && clientBookings.classList.contains('show'))) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+  }
+
+  if (invoiceModalClose) {
+    invoiceModalClose.addEventListener('click', closeInvoiceModal);
+  }
+
+  if (invoiceModalOverlay) {
+    invoiceModalOverlay.addEventListener('click', (e) => {
+      if (e.target === invoiceModalOverlay) closeInvoiceModal();
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && invoiceModalOverlay && invoiceModalOverlay.classList.contains('show')) {
+      closeInvoiceModal();
+    }
+  });
+
+  if (invoicePrintBtn) {
+    invoicePrintBtn.addEventListener('click', () => {
+      window.print();
+    });
+  }
+
+  if (invoiceDownloadBtn) {
+    invoiceDownloadBtn.addEventListener('click', () => {
+      if (!currentInvoiceData) return;
+      downloadInvoiceText(currentInvoiceData);
+    });
+  }
+
+  function downloadInvoiceText(inv) {
+    const lines = [
+      `============================================================`,
+      `               SALON HAIR BIRD — OFFICIAL RECEIPT`,
+      `============================================================`,
+      `Salon:        ${inv.salon.name}`,
+      `Address:      ${inv.salon.address}`,
+      `Phone:        ${inv.salon.phone}`,
+      `Email:        ${inv.salon.email}`,
+      `------------------------------------------------------------`,
+      `Invoice ID:   ${inv.invoiceId}`,
+      `Issue Date:   ${new Date().toLocaleDateString()}`,
+      `Status:       ${inv.status}`,
+      `------------------------------------------------------------`,
+      `CLIENT DETAILS:`,
+      `Name:         ${inv.clientName}`,
+      `Phone:        ${inv.clientPhone}`,
+      `Email:        ${inv.clientEmail}`,
+      `------------------------------------------------------------`,
+      `APPOINTMENT SCHEDULE:`,
+      `Date:         ${inv.date}`,
+      `Time Slot:    ${inv.timeSlot}`,
+      `Stylist:      ${inv.stylistName || 'Salon Specialist'}`,
+      `------------------------------------------------------------`,
+      `SERVICE:      ${inv.serviceName}`,
+      `Price:        Rs. ${Number(inv.price).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      `Service Tax:  Rs. 0.00 (Included)`,
+      `TOTAL PAID:   Rs. ${Number(inv.price).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      `============================================================`,
+      `Thank you for visiting Salon Hair Bird! We look forward to seeing you again.`,
+      `============================================================`
+    ].join('\r\n');
+
+    const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Invoice-${String(inv.invoiceId).replace(/[^a-zA-Z0-9_-]/g, '')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function renderInvoiceHtml(data) {
+    const priceNum = Number(data.price) || 0;
+    const formattedPrice = `Rs. ${priceNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const issueDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+    return `
+      <div class="invoice-paper">
+        <div class="invoice-top-header">
+          <div class="invoice-salon-brand">
+            <div class="invoice-brand-badge">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#C5A880" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </div>
+            <div>
+              <h2 class="invoice-salon-name">${escapeHtml(data.salon.name)}</h2>
+              <p class="invoice-salon-meta">Excellence in Hair &amp; Aesthetic Beauty</p>
+              <p class="invoice-salon-contact">
+                ${escapeHtml(data.salon.address)}<br/>
+                Phone: <a href="tel:${escapeHtml(data.salon.phone)}" style="color:#64748b; text-decoration:none;">${escapeHtml(data.salon.phone)}</a> &bull;
+                Email: <a href="mailto:${escapeHtml(data.salon.email)}" style="color:#64748b; text-decoration:none;">${escapeHtml(data.salon.email)}</a>
+              </p>
+            </div>
+          </div>
+          <div class="invoice-meta-box">
+            <div class="invoice-badge-title">OFFICIAL RECEIPT</div>
+            <div class="invoice-id-tag">${escapeHtml(data.invoiceId)}</div>
+            <div class="invoice-date-issued">Issue Date: <strong>${escapeHtml(issueDate)}</strong></div>
+            <div class="invoice-status-pill status-${escapeHtml((data.status || 'confirmed').toLowerCase())}">
+              ✓ ${escapeHtml(data.status || 'CONFIRMED')}
+            </div>
+          </div>
+        </div>
+
+        <div class="invoice-divider"></div>
+
+        <div class="invoice-details-grid">
+          <div class="invoice-party-col">
+            <span class="invoice-col-label">Billed To (Client)</span>
+            <strong class="invoice-client-name">${escapeHtml(data.clientName || 'Valued Customer')}</strong>
+            <div class="invoice-client-sub">Phone: ${escapeHtml(data.clientPhone || '—')}</div>
+            <div class="invoice-client-sub">Email: ${escapeHtml(data.clientEmail || '—')}</div>
+          </div>
+          <div class="invoice-party-col">
+            <span class="invoice-col-label">Appointment Schedule</span>
+            <div class="invoice-apt-line"><strong>Date:</strong> ${escapeHtml(data.date || '—')}</div>
+            <div class="invoice-apt-line"><strong>Time:</strong> ${escapeHtml(data.timeSlot || '—')}</div>
+            <div class="invoice-apt-line"><strong>Stylist:</strong> ${escapeHtml(data.stylistName || 'Any Specialist')}</div>
+          </div>
+        </div>
+
+        <div class="invoice-table-wrap">
+          <table class="invoice-table">
+            <thead>
+              <tr>
+                <th style="width: 38px;">#</th>
+                <th>Service Description</th>
+                <th style="text-align: center; width: 60px;">Qty</th>
+                <th style="text-align: right; width: 130px;">Unit Price</th>
+                <th style="text-align: right; width: 130px;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>
+                  <strong style="color: #0f172a;">${escapeHtml(data.serviceName || 'Salon Service')}</strong>
+                  <div style="font-size: 0.76rem; color: #64748b; margin-top: 2px;">Professional salon service &amp; aesthetic styling</div>
+                </td>
+                <td style="text-align: center;">1</td>
+                <td style="text-align: right;">${escapeHtml(formattedPrice)}</td>
+                <td style="text-align: right; font-weight: 700; color: #0f172a;">${escapeHtml(formattedPrice)}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" style="text-align: right; font-weight: 600; color: #475569;">Subtotal:</td>
+                <td style="text-align: right; font-weight: 600; color: #1e293b;">${escapeHtml(formattedPrice)}</td>
+              </tr>
+              <tr>
+                <td colspan="4" style="text-align: right; color: #64748b; font-size: 0.78rem;">Service Tax / VAT (0% Included):</td>
+                <td style="text-align: right; color: #64748b; font-size: 0.78rem;">Rs. 0.00</td>
+              </tr>
+              <tr class="invoice-total-row">
+                <td colspan="4" style="text-align: right; font-size: 0.95rem; font-weight: 700; color: #0f172a;">Total Amount:</td>
+                <td style="text-align: right; font-size: 1.15rem; font-weight: 800; color: #a88555;">${escapeHtml(formattedPrice)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="invoice-footer-notes">
+          <div class="invoice-thankyou">Thank you for choosing Salon Hair Bird!</div>
+          <p>Please keep this receipt for your records. For rescheduling, adjustments, or queries, please contact our reception at ${escapeHtml(data.salon.phone)} or email ${escapeHtml(data.salon.email)}.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  window.openInvoiceModal = function(invoiceData) {
+    if (!invoiceModalOverlay || !invoiceModalBody) return;
+
+    const defaultSalon = {
+      name: 'Salon Hair Bird',
+      address: '123 Colombo Street, Colombo 07, Sri Lanka',
+      phone: '077 123 4567',
+      email: 'info@salonhairbird.com'
+    };
+
+    const finalData = {
+      salon: (invoiceData && invoiceData.salon) || defaultSalon,
+      invoiceId: (invoiceData && invoiceData.invoiceId) || `INV-${Date.now().toString().slice(-6)}`,
+      clientName: (invoiceData && invoiceData.clientName) || 'Valued Customer',
+      clientPhone: (invoiceData && invoiceData.clientPhone) || '—',
+      clientEmail: (invoiceData && invoiceData.clientEmail) || '—',
+      serviceName: (invoiceData && invoiceData.serviceName) || 'General Styling',
+      price: (invoiceData && invoiceData.price) || 3500,
+      date: (invoiceData && invoiceData.date) || new Date().toISOString().split('T')[0],
+      timeSlot: (invoiceData && invoiceData.timeSlot) || '10:00 AM',
+      stylistName: (invoiceData && invoiceData.stylistName) || 'Salon Specialist',
+      status: (invoiceData && invoiceData.status) || 'CONFIRMED'
+    };
+
+    currentInvoiceData = finalData;
+    invoiceModalBody.innerHTML = renderInvoiceHtml(finalData);
+
+    invoiceModalOverlay.classList.add('show');
+    invoiceModalOverlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  };
+
 
   // --------------------------------------------------------------------------
   // MASTER APPOINTMENTS STORAGE & DISPATCH
@@ -1424,7 +1899,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Update notification counters in badges
   function updateAdminBadges() {
-    const list = getStoredAppointments();
+    const list = getStoredAppointments().filter(item => item.status !== 'waiting_list' && !item.movedToWaitingList);
     const pendingCount = list.filter(item => item.status === 'pending').length;
 
     if (adminLauncherBadge) {
@@ -1452,7 +1927,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderAdminDashboard() {
     if (!isAdminAuthenticated()) return;
 
-    const list = getStoredAppointments();
+    const rawList = getStoredAppointments();
+    const list = rawList.filter(item => item.status !== 'waiting_list' && !item.movedToWaitingList);
 
     const totalCount = list.length;
     const pendingCount = list.filter(i => i.status === 'pending').length;
@@ -1510,7 +1986,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const isPending = apt.status === 'pending';
       const isReview = apt.status === 'review';
       const isConfirmed = apt.status === 'confirmed';
+      const isCompleted = apt.status === 'completed';
       const isCancelled = apt.status === 'cancelled';
+      const isWaitingList = apt.status === 'waiting_list';
 
       const statusBadge = isPending
         ? '<span class="badge-status badge-pending"><span class="pulse-dot"></span> Pending</span>'
@@ -1518,6 +1996,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ? '<span class="badge-status badge-review"><span class="pulse-dot"></span> Seen / Review</span>'
         : isConfirmed
         ? '<span class="badge-status badge-confirmed">✓ Confirmed</span>'
+        : isCompleted
+        ? '<span class="badge-status badge-confirmed" style="background:#d1fae5;color:#065f46;border-color:#a7f3d0;">✅ Completed</span>'
+        : isWaitingList
+        ? '<span class="badge-status badge-waiting-list"><span class="pulse-dot" style="background:#D97706;"></span> ⏳ Waiting List</span>'
         : '<span class="badge-status badge-cancelled">Cancelled</span>';
 
       const createdFormatted = new Date(apt.createdAt).toLocaleString([], {
@@ -1541,7 +2023,9 @@ document.addEventListener('DOMContentLoaded', () => {
                   <option value="pending" ${isPending ? 'selected' : ''}>⏳ Pending</option>
                   <option value="review" ${isReview ? 'selected' : ''}>👀 Seen / Review</option>
                   <option value="confirmed" ${isConfirmed ? 'selected' : ''}>✓ Approved</option>
+                  <option value="completed" ${isCompleted ? 'selected' : ''}>✅ Completed</option>
                   <option value="cancelled" ${isCancelled ? 'selected' : ''}>✕ Rejected</option>
+                  <option value="waiting_list" ${isWaitingList ? 'selected' : ''}>⏳ Waiting List</option>
                 </select>
               </div>
               <div>${statusBadge}</div>
@@ -1601,7 +2085,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="card-actions-left">
               ${isPending ? `
                 <button type="button" class="btn-admin-review" data-action="review" title="Mark as Seen and Under Review">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                   <span>Mark as Seen</span>
                 </button>
               ` : ''}
@@ -1616,6 +2100,10 @@ document.addEventListener('DOMContentLoaded', () => {
                   <span>Revert to Pending</span>
                 </button>
               `}
+
+              <button type="button" class="btn-admin-action btn-wl-move" data-action="waiting-list" title="Move to Priority Waiting List">
+                ⏳ Waiting List
+              </button>
 
               ${!isCancelled ? `
                 <button type="button" class="btn-admin-decline" data-action="cancel" title="Decline / Reject this slot">
@@ -1645,14 +2133,30 @@ document.addEventListener('DOMContentLoaded', () => {
       // Status dropdown direct change
       const statusSelect = card.querySelector('.admin-status-select');
       if (statusSelect) {
-        statusSelect.addEventListener('change', (e) => {
+        statusSelect.addEventListener('change', async (e) => {
           const newSt = e.target.value;
           let note = (noteInput && noteInput.value.trim()) ? noteInput.value.trim() : undefined;
+
+          // If Waiting List selected directly from dropdown
+          if (newSt === 'waiting_list') {
+            await moveAppointmentToWaitingList(aptId, note);
+            return;
+          }
+
           if (!note) {
             if (newSt === 'review') note = 'Seen by Salon Manager. Stylist is reviewing schedule.';
             else if (newSt === 'confirmed') note = 'Confirmed! Looking forward to seeing you at Salon Hair Bride.';
             else if (newSt === 'cancelled') note = 'Slot unavailable. Please pick another date or time slot.';
           }
+
+          // If Reject / Cancel is selected from dropdown, offer to move to Waiting List
+          if (newSt === 'cancelled') {
+            if (confirm(`Booking #${aptId} is marked as unavailable/rejected.\n\nWould you like to move this request to the Priority Waiting List (status: pending) and notify the client?`)) {
+              await moveAppointmentToWaitingList(aptId, note);
+              return;
+            }
+          }
+
           updateAppointmentStatus(aptId, newSt, note);
           showAdminToast('Status Updated', `Booking #${aptId} status changed to ${newSt.toUpperCase()}.`);
         });
@@ -1661,12 +2165,27 @@ document.addEventListener('DOMContentLoaded', () => {
       // Preset chips click
       card.querySelectorAll('.preset-chip').forEach(chip => {
         chip.addEventListener('click', () => {
+          const chipNote = chip.getAttribute('data-note');
           if (noteInput) {
-            noteInput.value = chip.getAttribute('data-note');
+            noteInput.value = chipNote;
             noteInput.focus();
+          }
+          if (chipNote.includes('Slot unavailable')) {
+            if (confirm(`Slot is unavailable for booking #${aptId}.\n\nWould you like to move this request into the Priority Waiting List and notify the client?`)) {
+              moveAppointmentToWaitingList(aptId, chipNote);
+            }
           }
         });
       });
+
+      // Dedicated "Waiting List" button
+      const wlBtn = card.querySelector('[data-action="waiting-list"]');
+      if (wlBtn) {
+        wlBtn.addEventListener('click', async () => {
+          const customNote = (noteInput && noteInput.value.trim()) ? noteInput.value.trim() : undefined;
+          await moveAppointmentToWaitingList(aptId, customNote);
+        });
+      }
 
       // Mark as Seen / Review button
       const reviewBtn = card.querySelector('[data-action="review"]');
@@ -1714,12 +2233,17 @@ document.addEventListener('DOMContentLoaded', () => {
       // Cancel button
       const cancelBtn = card.querySelector('[data-action="cancel"]');
       if (cancelBtn) {
-        cancelBtn.addEventListener('click', () => {
+        cancelBtn.addEventListener('click', async () => {
           const customNote = (noteInput && noteInput.value.trim())
             ? noteInput.value.trim()
             : 'Slot unavailable. Please pick another date or time slot.';
-          updateAppointmentStatus(aptId, 'cancelled', customNote);
-          showAdminToast('Appointment Cancelled', `Booking #${aptId} marked as unavailable.`);
+          
+          if (confirm(`Decline booking #${aptId}?\n\nWould you like to move this request to the Priority Waiting List (status: pending) and notify the client?`)) {
+            await moveAppointmentToWaitingList(aptId, customNote);
+          } else {
+            updateAppointmentStatus(aptId, 'cancelled', customNote);
+            showAdminToast('Appointment Cancelled', `Booking #${aptId} marked as unavailable.`);
+          }
         });
       }
 
@@ -1762,16 +2286,25 @@ document.addEventListener('DOMContentLoaded', () => {
     let readableStatus = 'Updated';
     if (apt.status === 'review') readableStatus = 'Seen / Under Review';
     else if (apt.status === 'confirmed') readableStatus = 'Approved / Confirmed';
+    else if (apt.status === 'completed') readableStatus = 'Completed & Thank You';
     else if (apt.status === 'cancelled') readableStatus = 'Rejected / Cancelled';
     else if (apt.status === 'pending') readableStatus = 'Pending Salon Review';
+    else if (apt.status === 'waiting_list') readableStatus = 'Priority Waiting List';
     else readableStatus = apt.status ? (apt.status.charAt(0).toUpperCase() + apt.status.slice(1)) : 'Updated';
+
+    const defaultWlMsg = `Dear ${apt.name || 'Valued Customer'}, your requested appointment for ${apt.service || 'Salon Service'} on ${apt.date || 'your requested date'} (${apt.time || 'selected slot'}) is currently placed on our Priority Waiting List as the slot is fully booked. We will notify you immediately as soon as a slot opens up!`;
+    const defaultCompletedMsg = `Thank you for visiting Salon Hair Bride! We hope you loved your ${apt.service || 'service'}. We would love your feedback — please rate your visit using booking code #${apt.id}!`;
 
     const templateParams = {
       customer_name : apt.name    || 'Valued Customer',
       booking_date  : apt.date    || 'N/A',
       time_slot     : apt.time    || 'N/A',
       status        : readableStatus,
-      admin_note    : apt.adminNote || 'No additional notes.',
+      admin_note    : apt.status === 'waiting_list'
+        ? (apt.adminNote || defaultWlMsg)
+        : apt.status === 'completed'
+        ? (apt.adminNote || defaultCompletedMsg)
+        : (apt.adminNote || 'No additional notes.'),
       email         : apt.email
     };
 
@@ -1786,7 +2319,102 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
+  // -----------------------------------------------------------------------
+  // Move Appointment to Priority Waiting List Workflow
+  // -----------------------------------------------------------------------
+  async function moveAppointmentToWaitingList(aptId, customNote) {
+    const list = getStoredAppointments();
+    const apt = list.find(item => item.id === aptId);
+    if (!apt) {
+      console.warn('Appointment not found:', aptId);
+      return;
+    }
+
+    const clientName = apt.name || apt.client_name || 'Valued Client';
+    const serviceName = apt.service || apt.service_name || 'Salon Service';
+    const dateStr = apt.date || apt.appointment_date || 'N/A';
+    const timeStr = apt.time || apt.time_slot || 'N/A';
+
+    const customerMessage = `Dear ${clientName}, your requested appointment for ${serviceName} on ${dateStr} (${timeStr}) is currently placed on our Priority Waiting List as the slot is fully booked. We will notify you immediately as soon as a slot opens up!`;
+    const note = customNote || apt.adminNote || 'Slot unavailable. Placed on Priority Waiting List.';
+
+    // Update appointment state locally
+    apt.status = 'waiting_list';
+    apt.movedToWaitingList = true;
+    apt.adminNote = note;
+    apt.updatedAt = new Date().toISOString();
+
+    saveAppointments(list, true);
+    updateAdminBadges();
+    if (isAdminAuthenticated()) {
+      renderAdminDashboard();
+    }
+    syncActiveCustomerBooking();
+    updateAvailableSlots();
+
+    // Trigger customer notification via EmailJS if email exists
+    try {
+      sendConfirmationEmail({
+        ...apt,
+        status: 'waiting_list',
+        adminNote: customerMessage
+      });
+    } catch (e) {
+      console.warn('[EmailJS] Notification fallback:', e);
+    }
+
+    // Call backend API to persist in waiting_list table & dispatch SMS/Email
+    try {
+      const token = sessionStorage.getItem('salon_admin_token') || localStorage.getItem('salon_admin_token') || localStorage.getItem('salon_auth_token');
+      const payload = {
+        notes: note,
+        name: apt.name,
+        phone: apt.phone,
+        email: apt.email,
+        service: apt.service,
+        date: apt.date,
+        time: apt.time,
+        stylist_id: apt.stylistId || apt.stylist_id || null,
+        service_id: apt.serviceId || apt.service_id || null
+      };
+
+      const resp = await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(aptId)}/move-to-waiting-list`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!resp.ok) {
+        // Fallback to status endpoint with moveToWaitingList flag
+        await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(aptId)}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ status: 'waiting_list', adminNote: note, moveToWaitingList: true })
+        });
+      }
+    } catch (apiErr) {
+      console.warn('Backend sync for waiting list:', apiErr.message);
+    }
+
+    // Clear confirmation toast on the Admin Panel
+    showAdminToast('Waiting List Updated ✓', 'Appointment moved to Waiting List and notification sent to client.');
+    console.log('[Waiting List Notification Dispatched]:', customerMessage);
+
+    // Notify other panels (like Waiting List tab) to refresh dynamically
+    window.dispatchEvent(new CustomEvent('salon:waiting_list_changed', { detail: { id: aptId, entry: apt } }));
+  }
+
   async function updateAppointmentStatus(id, newStatus, note) {
+    if (newStatus === 'waiting_list') {
+      await moveAppointmentToWaitingList(id, note);
+      return;
+    }
     const list = getStoredAppointments();
     const apt = list.find(item => item.id === id);
     if (apt) {
@@ -1805,7 +2433,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Async backend sync if available
       try {
-        const token = sessionStorage.getItem('salon_admin_token') || localStorage.getItem('salon_auth_token');
+        const token = sessionStorage.getItem('salon_admin_token') || localStorage.getItem('salon_admin_token') || localStorage.getItem('salon_auth_token');
         await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(id)}/status`, {
           method: 'PATCH',
           headers: {
@@ -1836,7 +2464,7 @@ document.addEventListener('DOMContentLoaded', () => {
       syncActiveCustomerBooking();
 
       try {
-        const token = sessionStorage.getItem('salon_admin_token') || localStorage.getItem('salon_auth_token');
+        const token = sessionStorage.getItem('salon_admin_token') || localStorage.getItem('salon_admin_token') || localStorage.getItem('salon_auth_token');
         await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(id)}/note`, {
           method: 'PATCH',
           headers: {
@@ -1860,7 +2488,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAvailableSlots();
 
     try {
-      const token = sessionStorage.getItem('salon_admin_token') || localStorage.getItem('salon_auth_token');
+      const token = sessionStorage.getItem('salon_admin_token') || localStorage.getItem('salon_admin_token') || localStorage.getItem('salon_auth_token');
       await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: {
@@ -1870,12 +2498,10 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {}
   }
 
-  // Open & Close Admin Modal (REQUIRES ADMIN AUTHENTICATION)
+  // Open & Close Admin Modal (REQUIRES STRICT ADMIN AUTHENTICATION)
   function openAdminModal() {
-    if (!isAdminAuthenticated()) {
-      openAuthModal('admin');
-      return;
-    }
+    // No valid session token → session purged + immediate redirect to login
+    if (!enforceAdminSession(true)) return;
 
     if (!adminModalOverlay) return;
     adminModalOverlay.classList.add('show');
@@ -2125,3 +2751,173 @@ function sendSummaryToWhatsApp() {
         console.error("Error in sendSummaryToWhatsApp:", error);
     }
 }
+
+// =========================================================================
+// SMART WAITING LIST CUSTOMER MODAL HANDLERS
+// =========================================================================
+const waitingListModalOverlay = document.getElementById('waitingListModalOverlay');
+const waitingListModalClose   = document.getElementById('waitingListModalClose');
+const publicWaitingListForm   = document.getElementById('publicWaitingListForm');
+const waitingListFormAlert    = document.getElementById('waitingListFormAlert');
+
+async function populateWaitingListStylists() {
+  const sel = document.getElementById('wlStylistSelect');
+  if (!sel || sel.dataset.loaded === 'true') return;
+  try {
+    const res = await fetch(`${API_BASE_URL}/stylists`);
+    if (res.ok) {
+      const data = await res.json();
+      const stylists = data.stylists || data.data || [];
+      if (Array.isArray(stylists) && stylists.length > 0) {
+        sel.innerHTML = '<option value="">Any Available Stylist</option>' +
+          stylists.filter(s => s.is_active).map(s => `<option value="${s.id}">${s.name} (${s.specialization || 'Stylist'})</option>`).join('');
+        sel.dataset.loaded = 'true';
+      }
+    }
+  } catch (e) {}
+}
+
+function openWaitingListModal(prefill = {}) {
+  if (!waitingListModalOverlay) return;
+
+  const inName  = document.getElementById('wlClientName');
+  const inPhone = document.getElementById('wlClientPhone');
+  const inEmail = document.getElementById('wlClientEmail');
+  const inDate  = document.getElementById('wlPrefDate');
+  const inSlot  = document.getElementById('wlPrefSlot');
+  const inSvc   = document.getElementById('wlServiceName');
+  const inStylist = document.getElementById('wlStylistSelect');
+  const inNotes = document.getElementById('wlNotes');
+
+  if (waitingListFormAlert) {
+    waitingListFormAlert.style.display = 'none';
+    waitingListFormAlert.textContent = '';
+    waitingListFormAlert.className = 'feedback-form-alert';
+  }
+
+  const curUser = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
+
+  if (inName)  inName.value  = prefill.name || (curUser ? curUser.name : '') || '';
+  if (inPhone) inPhone.value = prefill.phone || (curUser ? curUser.phone : '') || '';
+  if (inEmail) inEmail.value = prefill.email || (curUser ? curUser.email : '') || '';
+  if (inDate)  inDate.value  = prefill.date || '';
+  if (inSlot)  inSlot.value  = prefill.slot || '';
+  if (inSvc && prefill.serviceName) inSvc.value = prefill.serviceName;
+  if (inStylist && prefill.stylistId) inStylist.value = prefill.stylistId;
+  if (inNotes) inNotes.value = prefill.notes || '';
+
+  populateWaitingListStylists();
+
+  waitingListModalOverlay.classList.add('show');
+  waitingListModalOverlay.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeWaitingListModal() {
+  if (!waitingListModalOverlay) return;
+  waitingListModalOverlay.classList.remove('show');
+  waitingListModalOverlay.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+if (waitingListModalClose) {
+  waitingListModalClose.addEventListener('click', closeWaitingListModal);
+}
+if (waitingListModalOverlay) {
+  waitingListModalOverlay.addEventListener('click', (e) => {
+    if (e.target === waitingListModalOverlay) closeWaitingListModal();
+  });
+}
+
+window.openWaitingListModal = openWaitingListModal;
+window.closeWaitingListModal = closeWaitingListModal;
+
+if (publicWaitingListForm) {
+  publicWaitingListForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const inName    = document.getElementById('wlClientName');
+    const inPhone   = document.getElementById('wlClientPhone');
+    const inEmail   = document.getElementById('wlClientEmail');
+    const inDate    = document.getElementById('wlPrefDate');
+    const inSlot    = document.getElementById('wlPrefSlot');
+    const inSvc     = document.getElementById('wlServiceName');
+    const inStylist = document.getElementById('wlStylistSelect');
+    const inNotes   = document.getElementById('wlNotes');
+    const submitBtn = document.getElementById('wlSubmitBtn');
+
+    function showWlAlert(msg, ok) {
+      if (!waitingListFormAlert) return;
+      waitingListFormAlert.textContent = msg;
+      waitingListFormAlert.className = `feedback-form-alert ${ok ? 'alert-success' : 'alert-error'}`;
+      waitingListFormAlert.style.display = 'block';
+    }
+
+    const clientName  = inName ? inName.value.trim() : '';
+    const clientPhone = inPhone ? inPhone.value.trim() : '';
+    const clientEmail = inEmail ? inEmail.value.trim() : '';
+    const prefDate    = inDate ? inDate.value.trim() : '';
+    const prefSlot    = inSlot ? inSlot.value.trim() : '';
+    const serviceName = inSvc ? inSvc.value : '';
+    const stylistId   = inStylist && inStylist.value ? Number(inStylist.value) : null;
+    const notes       = inNotes ? inNotes.value.trim() : '';
+
+    if (!clientName || clientName.length < 2) {
+      showWlAlert('Please enter your full name (at least 2 characters).', false);
+      return;
+    }
+    if (!clientPhone || clientPhone.length < 9) {
+      showWlAlert('Please enter a valid phone number (e.g. 0771234567).', false);
+      return;
+    }
+    if (!prefDate) {
+      showWlAlert('Please select your preferred date.', false);
+      return;
+    }
+    if (!prefSlot) {
+      showWlAlert('Please enter your requested time slot.', false);
+      return;
+    }
+
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      const payload = {
+        clientName,
+        clientPhone,
+        clientEmail,
+        preferredDate: prefDate,
+        preferredTimeSlot: prefSlot,
+        serviceName,
+        stylistId,
+        notes
+      };
+
+      const res = await fetch(`${API_BASE_URL}/waiting-list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to join waiting list.');
+      }
+
+      showWlAlert(`🎉 ${data.message || "You've successfully joined the Priority Waiting List!"}`, true);
+      publicWaitingListForm.reset();
+
+      if (typeof showAdminToast === 'function') {
+        showAdminToast('Waiting List Updated', `${clientName} joined the waiting list for ${prefDate} (${prefSlot}).`);
+      }
+
+      setTimeout(() => {
+        closeWaitingListModal();
+      }, 2500);
+    } catch (err) {
+      showWlAlert(err.message || 'An error occurred while joining the waiting list.', false);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+}
