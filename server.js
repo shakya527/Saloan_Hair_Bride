@@ -1,14 +1,14 @@
 /**
  * =========================================================================
- * SALON HAIR BRIDE — PRODUCTION-READY BACKEND API & MYSQL DATABASE SERVER
- * Stack: Node.js • Express • MySQL / phpMyAdmin (mysql2) • JWT • Bcrypt
- * Database: salon_db (Host: localhost | User: root | Password: '')
+ * SALON HAIR BRIDE — PRODUCTION-READY BACKEND API & TURSO DATABASE SERVER
+ * Stack: Node.js • Express • Turso (libSQL) • JWT • Bcrypt
+ * Database: Turso cloud database (configured via TURSO_DATABASE_URL env var)
  * =========================================================================
  */
 
 const express = require('express');
 const cors = require('cors');
-const mysql = require('mysql2/promise');
+const { pool } = require('./db');   // ← Turso/libSQL compatibility layer
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
@@ -70,17 +70,16 @@ const TIME_SLOTS = [
   '07:15 PM - 08:00 PM'
 ];
 
-// MySQL Connection Configuration (Configured for XAMPP / WAMP / phpMyAdmin)
-const DB_CONFIG = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'salon_db',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  dateStrings: true // Returns dates as strings 'YYYY-MM-DD'
-};
+
+// =========================================================================
+// DATABASE CONFIGURATION (Turso / libSQL)
+// =========================================================================
+// Connection is handled by db.js using environment variables:
+//   TURSO_DATABASE_URL  — e.g. libsql://your-db.turso.io
+//   TURSO_AUTH_TOKEN    — Turso auth token from the dashboard
+//
+// The `pool` object imported from db.js is drop-in compatible with
+// mysql2/promise pool.query() — all existing SQL queries work unchanged.
 
 // Middleware
 app.use(cors({
@@ -105,7 +104,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(__dirname)); // Serve frontend static files directly
 
-let pool;
 
 // =========================================================================
 // 1. DATABASE INITIALIZATION & SCHEMA AUTO-MIGRATION
@@ -116,18 +114,25 @@ let pool;
 let appointmentColumns = null;
 
 async function refreshAppointmentColumns() {
-  if (!pool) return;
-  const [rows] = await pool.query(
-    `SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE, COLUMN_DEFAULT
-     FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'appointments'`,
-    [DB_CONFIG.database]
-  );
-  appointmentColumns = new Map(rows.map(r => [r.COLUMN_NAME, {
-    type: r.DATA_TYPE,
-    maxLength: r.CHARACTER_MAXIMUM_LENGTH,
-    nullable: r.IS_NULLABLE === 'YES',
-    default: r.COLUMN_DEFAULT
-  }]));
+  try {
+    // Use SQLite PRAGMA to enumerate columns — db.js INFORMATION_SCHEMA emulation
+    // handles the query translation automatically via pool.query().
+    const [rows] = await pool.query(
+      `SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE, COLUMN_DEFAULT
+       FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'appointments'`,
+      ['main', 'appointments']
+    );
+    if (rows && rows.length > 0) {
+      appointmentColumns = new Map(rows.map(r => [r.COLUMN_NAME, {
+        type: r.DATA_TYPE,
+        maxLength: r.CHARACTER_MAXIMUM_LENGTH,
+        nullable: r.IS_NULLABLE === 'YES',
+        default: r.COLUMN_DEFAULT
+      }]));
+    }
+  } catch (e) {
+    // Non-fatal — handlers will use hasAppointmentColumn's fallback
+  }
 }
 
 function hasAppointmentColumn(col) {
@@ -167,33 +172,24 @@ const APPOINTMENTS_COLUMN_SPECS = [
 
 async function initDatabase() {
   try {
-    // 1. Bootstrap: Connect to MySQL server and ensure 'salon_db' exists
-    const bootstrapConn = await mysql.createConnection({
-      host: DB_CONFIG.host,
-      user: DB_CONFIG.user,
-      password: DB_CONFIG.password
-    });
+    // Validate connection to Turso — pool.getConnection() returns a stub but
+    // triggers credential validation inside db.js.
+    const conn = await pool.getConnection();
+    conn.release();
 
-    await bootstrapConn.query(`CREATE DATABASE IF NOT EXISTS \`${DB_CONFIG.database}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-    await bootstrapConn.end();
-
-    // 2. Initialize connection pool connected to 'salon_db'
-    pool = mysql.createPool(DB_CONFIG);
-
-    const testConn = await pool.getConnection();
     console.log(`=======================================================`);
-    console.log(`✅ Connected to MySQL Database [${DB_CONFIG.database}] via phpMyAdmin`);
-    console.log(`📍 Host: ${DB_CONFIG.host} | User: ${DB_CONFIG.user}`);
+    console.log(`✅ Connected to Turso (libSQL) Cloud Database`);
+    console.log(`📍 URL: ${process.env.TURSO_DATABASE_URL || '(not set)'}`);
     console.log(`=======================================================`);
-    testConn.release();
 
-    // 3. Create tables and seed initial default records
+    // Create tables and seed initial default records
     await createDatabaseTables();
   } catch (err) {
-    console.error('❌ Could not connect to MySQL database:', err.message);
-    console.error('💡 Ensure MySQL is running in XAMPP / WAMP / phpMyAdmin on port 3306.');
+    console.error('❌ Could not connect to Turso database:', err.message);
+    console.error('💡 Ensure TURSO_DATABASE_URL and TURSO_AUTH_TOKEN are set in .env or Vercel environment variables.');
   }
 }
+
 
 async function createDatabaseTables() {
   try {
@@ -405,7 +401,7 @@ async function createDatabaseTables() {
     for (const [col, definition] of APPOINTMENTS_COLUMN_SPECS) {
       const [colRows] = await pool.query(
         "SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'appointments' AND COLUMN_NAME = ?",
-        [DB_CONFIG.database, col]
+        ['main', col]
       );
       if (Number(colRows[0].c) === 0) {
         try {
@@ -431,7 +427,7 @@ async function createDatabaseTables() {
     ]) {
       const [colRows] = await pool.query(
         "SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
-        [DB_CONFIG.database, table, col]
+        ['main', table, col]
       );
       if (Number(colRows[0].c) === 0) {
         try {
@@ -465,7 +461,7 @@ async function createDatabaseTables() {
     ]) {
       const [keyRows] = await pool.query(
         "SELECT COUNT(DISTINCT INDEX_NAME) AS c FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'appointments' AND INDEX_NAME = ?",
-        [DB_CONFIG.database, keyName]
+        ['main', keyName]
       );
       if (Number(keyRows[0].c) === 0) {
         try {
@@ -654,10 +650,8 @@ function optionalToken(req, res, next) {
 app.get('/api/health', async (req, res) => {
   let dbStatus = 'disconnected';
   try {
-    if (pool) {
-      await pool.query('SELECT 1');
-      dbStatus = 'connected (MySQL / phpMyAdmin: salon_db)';
-    }
+    await pool.query('SELECT 1');
+    dbStatus = 'connected (Turso / libSQL)';
   } catch (e) {
     dbStatus = 'error: ' + e.message;
   }
@@ -665,9 +659,7 @@ app.get('/api/health', async (req, res) => {
   res.json({
     status: 'online',
     database: dbStatus,
-    host: DB_CONFIG.host,
-    user: DB_CONFIG.user,
-    database_name: DB_CONFIG.database,
+    database_url: process.env.TURSO_DATABASE_URL ? process.env.TURSO_DATABASE_URL.replace(/\/\/[^@]+@/, '//***@') : '(not set)',
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
@@ -1215,7 +1207,7 @@ async function countBookableStylists(date, time) {
 // 1. Create Appointment (Public / Authenticated Client -> Saves directly into MySQL `appointments` table)
 app.post('/api/appointments', optionalToken, async (req, res) => {
   try {
-    if (!pool) return res.status(503).json({ success: false, message: 'MySQL database connection not ready.' });
+    if (!pool) return res.status(503).json({ success: false, message: 'Database connection not ready.' });
 
     const { name, phone, email, service, date, time, message } = req.body;
     if (!name || !phone || !email || !service || !date || !time) {
@@ -3837,20 +3829,49 @@ async function sendDueReviewRequests() {
   }
 }
 
-// Initialize schema/migrations BEFORE accepting traffic, so no request can hit
-// a half-migrated database (root cause of intermittent 'Failed to record
-// appointment in database' 500s right after server start).
-(async () => {
-  await initDatabase();
-  app.listen(PORT, () => {
-    console.log(`=======================================================`);
-    console.log(`✨ Salon Hair Bride Backend Server Running on Port: ${PORT}`);
-    console.log(`🌐 API Base URL: http://localhost:${PORT}/api`);
-    console.log(`🗄️ Database Target: MySQL [${DB_CONFIG.database}]`);
-    console.log(`=======================================================`);
-    setInterval(sendDueReminders, REMINDER_CHECK_INTERVAL_MS);
-    setTimeout(sendDueReminders, 10 * 1000); // first sweep shortly after boot
-    setInterval(sendDueReviewRequests, REVIEW_CHECK_INTERVAL_MS);
-    setTimeout(sendDueReviewRequests, 15 * 1000); // first sweep shortly after boot
-  });
-})();
+let dbInitPromise = null;
+function ensureDatabaseInitialized() {
+  if (!dbInitPromise) {
+    dbInitPromise = initDatabase().catch(err => {
+      console.error('❌ Failed to initialize database:', err.message);
+      dbInitPromise = null; // allow retry on next attempt
+      throw err;
+    });
+  }
+  return dbInitPromise;
+}
+
+// Middleware to ensure database schema is ready before handling API requests
+app.use(async (req, res, next) => {
+  try {
+    await ensureDatabaseInitialized();
+  } catch (err) {
+    // Non-fatal fallback: let request proceed so endpoint error handlers can return clean 503/500
+  }
+  next();
+});
+
+// Start HTTP server when running as a standalone process (local development)
+if (!process.env.VERCEL) {
+  (async () => {
+    try {
+      await ensureDatabaseInitialized();
+    } catch (e) {
+      // logged in ensureDatabaseInitialized
+    }
+    app.listen(PORT, () => {
+      console.log(`=======================================================`);
+      console.log(`✨ Salon Hair Bride Backend Server Running on Port: ${PORT}`);
+      console.log(`🌐 API Base URL: http://localhost:${PORT}/api`);
+      console.log(`🗄️ Database: Turso (libSQL) — ${process.env.TURSO_DATABASE_URL || '(URL not set)'}`);
+      console.log(`=======================================================`);
+      setInterval(sendDueReminders, REMINDER_CHECK_INTERVAL_MS);
+      setTimeout(sendDueReminders, 10 * 1000); // first sweep shortly after boot
+      setInterval(sendDueReviewRequests, REVIEW_CHECK_INTERVAL_MS);
+      setTimeout(sendDueReviewRequests, 15 * 1000); // first sweep shortly after boot
+    });
+  })();
+}
+
+// Export Express app for Vercel Serverless Functions
+module.exports = app;
