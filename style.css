@@ -322,6 +322,8 @@ button, input, select, textarea {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   z-index: 1000;
+  /* Add top padding to give breathing space from viewport top */
+  padding-top: 0.75rem;
   border-bottom: 1px solid rgba(232, 226, 216, 0.8);
   transition: background-color 0.3s, box-shadow 0.3s;
 }
