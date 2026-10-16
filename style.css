@@ -7186,3 +7186,41 @@ input[type="date"].form-input::-webkit-calendar-picker-indicator:hover {
         font-size: 14px !important;
     }
 }
+/* Mobile responsive fixes for Appointment Form & Action Buttons */
+@media screen and (max-width: 768px) {
+    /* Form container padding and sizing fix */
+    .appointment-form, form, .booking-container {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding-left: 15px !important;
+        padding-right: 15px !important;
+    }
+
+    /* Input fields and buttons alignment */
+    input, select, textarea, .form-control {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Action buttons container (Book Appointment & WhatsApp buttons) */
+    .button-group, .form-actions, .appointment-actions, div:has(> .btn-whatsapp-direct), div:has(> #bookAppointmentBtn) {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Make both buttons span 100% width cleanly without cutting off */
+    .button-group button, .button-group a, 
+    .form-actions button, .form-actions a, 
+    .appointment-actions button, .appointment-actions a,
+    .btn-whatsapp-direct, #bookAppointmentBtn {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        text-align: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
+    }
+}
