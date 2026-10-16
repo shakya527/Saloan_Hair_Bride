@@ -3196,3 +3196,34 @@ if (publicWaitingListForm) {
     }
   });
 }
+// Universal Mobile Menu Toggle
+document.addEventListener('click', function(event) {
+  
+    const menuToggle = event.target.closest('.menu-toggle, .hamburger, header button, .nav-icon, [class*="menu"], [class*="toggle"]');
+    
+    if (menuToggle) {
+        
+        const navMenu = document.querySelector('nav ul, .nav-links, .nav-menu, nav');
+        if (navMenu) {
+            navMenu.classList.toggle('active');
+            event.stopPropagation();
+        }
+    }
+});
+// Perfect Mobile Menu Toggle using existing ID
+const menuToggleBtn = document.getElementById('menuToggleBtn');
+const navMenu = document.getElementById('navMenu');
+
+if (menuToggleBtn && navMenu) {
+    menuToggleBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        navMenu.classList.toggle('active');
+    });
+
+   
+    document.addEventListener('click', function(e) {
+        if (!navMenu.contains(e.target) && !menuToggleBtn.contains(e.target)) {
+            navMenu.classList.remove('active');
+        }
+    });
+}
