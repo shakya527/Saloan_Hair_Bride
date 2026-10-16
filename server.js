@@ -49,8 +49,8 @@ const SALON = {
 };
 
 // Slot capacity: max concurrent appointments per time slot.
-// Effective capacity per slot = min(MAX_BOOKINGS_PER_SLOT, stylists on duty for that date).
-const MAX_BOOKINGS_PER_SLOT = Math.max(1, parseInt(process.env.MAX_BOOKINGS_PER_SLOT, 10) || 5);
+// Strictly capped at a maximum of 5 separate appointments for 5 different customers per time slot.
+const MAX_BOOKINGS_PER_SLOT = 5;
 
 // Canonical booking windows offered to customers (must mirror the <option> list in index.html).
 const TIME_SLOTS = [
@@ -100,8 +100,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(express.static(__dirname)); // Serve frontend static files directly
 
 
@@ -1170,7 +1170,24 @@ app.get('/api/slots/availability', async (req, res) => {
 // Candidates: active stylists, not on time-off that date, no block-out for this
 // exact slot, and not already booked in this slot. Ordered by workload (today's
 // load, then upcoming load) so bookings spread evenly.
-async function findAvailableStylist(date, time) {
+async function findAvailableStylist(date, time, preferredStylistId = null) {
+  // If a specific stylist is requested, check if they are bookable and available for this slot
+  if (preferredStylistId && Number.isInteger(Number(preferredStylistId))) {
+    const [pref] = await pool.query(
+      `SELECT s.id, s.name, s.specialization
+       FROM stylists s
+       WHERE s.id = ? AND s.is_active = 1
+         AND NOT EXISTS (SELECT 1 FROM stylist_time_offs t WHERE t.stylist_id = s.id AND t.off_date = ?)
+         AND NOT EXISTS (SELECT 1 FROM stylist_blocks b WHERE b.stylist_id = s.id AND b.block_date = ? AND b.time_slot = ?)
+         AND NOT EXISTS (SELECT 1 FROM appointments a
+                          WHERE a.stylist_id = s.id AND a.appointment_date = ? AND a.time_slot = ? AND a.status != 'cancelled')
+       LIMIT 1`,
+      [Number(preferredStylistId), date, date, time, date, time]
+    );
+    if (pref.length > 0) return pref[0];
+  }
+
+  // Workload-balanced auto-assignment across all 10 roster staff
   const [candidates] = await pool.query(
     `SELECT s.id, s.name, s.specialization,
         (SELECT COUNT(*) FROM appointments a
@@ -1231,8 +1248,7 @@ app.post('/api/appointments', optionalToken, async (req, res) => {
       } catch (err) {}
     }
 
-    // Capacity check: effective capacity = min(MAX_BOOKINGS_PER_SLOT, stylists
-    // bookable for THIS exact slot — day-offs and slot block-outs both shrink it)
+    // Capacity check: restrict calendar/time slots to accommodate a maximum of 5 separate appointments for 5 different customers per time slot
     const bookable = await countBookableStylists(date, time);
     const capacity = Math.min(MAX_BOOKINGS_PER_SLOT, bookable);
 
@@ -1241,8 +1257,22 @@ app.post('/api/appointments', optionalToken, async (req, res) => {
       [date, time]
     );
     if (Number(countRows[0].booked) >= capacity) {
-      return res.status(409).json({ success: false, message: 'This time slot is fully booked for the selected date. Please choose another date or time slot.' });
+      return res.status(409).json({ success: false, message: 'This time slot is Reserved for the selected date. Please choose another date or time slot.' });
     }
+
+    // Verify distinct customer restriction: maximum of 5 separate appointments for 5 different customers per time slot
+    const [existingCustomerBooking] = await pool.query(
+      "SELECT id, booking_code FROM appointments WHERE appointment_date = ? AND time_slot = ? AND status != 'cancelled' AND (client_phone = ? OR (client_email IS NOT NULL AND client_email != '' AND LOWER(client_email) = ?)) LIMIT 1",
+      [date, time, cleanPhone, cleanEmail]
+    );
+    if (existingCustomerBooking.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: `You already have an appointment reserved for this time slot (Booking #${existingCustomerBooking[0].booking_code}). Time slots accommodate a maximum of 5 separate appointments for 5 different customers.`
+      });
+    }
+
+    const requestedStylistId = req.body.stylistId && Number.isInteger(Number(req.body.stylistId)) ? Number(req.body.stylistId) : null;
 
     // Build the INSERT from columns that actually exist post-migration; absent
     // optional columns (user_id, stylist_id, customer_notes, admin_note) fall
@@ -1282,7 +1312,7 @@ app.post('/api/appointments', optionalToken, async (req, res) => {
       insertVals[0] = bookingCode;
       assignedStylist = null;
       if (stylistValIdx >= 0) {
-        assignedStylist = await findAvailableStylist(date, time);
+        assignedStylist = await findAvailableStylist(date, time, requestedStylistId);
         if (!assignedStylist) {
           return res.status(409).json({ success: false, message: 'No stylists are available for this time slot. Please choose another date or time slot.' });
         }
@@ -1942,6 +1972,147 @@ app.patch('/api/appointments/:id/note', requireAdmin, async (req, res) => {
   }
 });
 
+// 5b. Comprehensive Edit / Update Appointment (ADMIN ONLY)
+app.put('/api/appointments/:id', requireAdmin, async (req, res) => {
+  try {
+    if (!pool) return res.status(503).json({ success: false, message: 'Database connection not ready.' });
+
+    const { id } = req.params;
+    const {
+      clientName,
+      clientPhone,
+      clientEmail,
+      service,
+      date,
+      time,
+      stylistId,
+      status,
+      visitStatus,
+      customerNotes,
+      adminNote
+    } = req.body;
+
+    const [aptRows] = await pool.query('SELECT * FROM appointments WHERE booking_code = ? OR id = ?', [id, id]);
+    if (aptRows.length === 0) return res.status(404).json({ success: false, message: `Appointment #${id} not found.` });
+    const apt = aptRows[0];
+
+    const newName = clientName !== undefined ? String(clientName).trim() : apt.client_name;
+    const newPhone = clientPhone !== undefined ? String(clientPhone).trim() : apt.client_phone;
+    const newEmail = clientEmail !== undefined ? String(clientEmail).toLowerCase().trim() : apt.client_email;
+    const newService = service !== undefined ? String(service).trim() : apt.service_name;
+    const newDate = date !== undefined ? String(date).trim() : apt.appointment_date;
+    const newTime = time !== undefined ? String(time).trim() : apt.time_slot;
+    let newStylistId = stylistId !== undefined ? (stylistId ? Number(stylistId) : null) : apt.stylist_id;
+    const newStatus = status !== undefined ? String(status).trim() : apt.status;
+    const newVisitStatus = visitStatus !== undefined ? String(visitStatus).trim() : apt.visit_status;
+    const newCustNotes = customerNotes !== undefined ? String(customerNotes) : apt.customer_notes;
+    const newAdminNote = adminNote !== undefined ? String(adminNote) : apt.admin_note;
+
+    // If date or slot changed and appointment is active, check capacity (max 5)
+    if ((newDate !== apt.appointment_date || newTime !== apt.time_slot) && newStatus !== 'cancelled') {
+      const [countRows] = await pool.query(
+        "SELECT COUNT(*) AS booked FROM appointments WHERE appointment_date = ? AND time_slot = ? AND status != 'cancelled' AND id != ?",
+        [newDate, newTime, apt.id]
+      );
+      if (Number(countRows[0].booked) >= 5) {
+        return res.status(409).json({ success: false, message: 'Target time slot is fully booked (5 separate appointments maximum).' });
+      }
+    }
+
+    // Validate stylist availability if assigned
+    if (newStylistId && newStatus !== 'cancelled') {
+      const [sRows] = await pool.query('SELECT id, name, is_active FROM stylists WHERE id = ?', [newStylistId]);
+      if (sRows.length === 0 || !sRows[0].is_active) {
+        return res.status(400).json({ success: false, message: 'Assigned stylist is inactive or not found.' });
+      }
+      const [offRows] = await pool.query('SELECT id, reason FROM stylist_time_offs WHERE stylist_id = ? AND off_date = ? LIMIT 1', [newStylistId, newDate]);
+      if (offRows.length > 0) {
+        return res.status(409).json({ success: false, message: `${sRows[0].name} is on leave on ${newDate}${offRows[0].reason ? ` (${offRows[0].reason})` : ''}.` });
+      }
+      const [blockRows] = await pool.query('SELECT id, reason FROM stylist_blocks WHERE stylist_id = ? AND block_date = ? AND time_slot = ? LIMIT 1', [newStylistId, newDate, newTime]);
+      if (blockRows.length > 0) {
+        return res.status(409).json({ success: false, message: `${sRows[0].name} has a blocked out time in this slot${blockRows[0].reason ? ` (${blockRows[0].reason})` : ''}.` });
+      }
+      const [conflict] = await pool.query(
+        "SELECT id, booking_code FROM appointments WHERE stylist_id = ? AND appointment_date = ? AND time_slot = ? AND status != 'cancelled' AND id != ? LIMIT 1",
+        [newStylistId, newDate, newTime, apt.id]
+      );
+      if (conflict.length > 0) {
+        return res.status(409).json({ success: false, message: `${sRows[0].name} already has appointment #${conflict[0].booking_code} booked for this time.` });
+      }
+    }
+
+    let checkInTime = apt.check_in_time;
+    let completedTime = apt.completed_time;
+    if (newVisitStatus === 'checked_in' && !checkInTime) checkInTime = new Date().toISOString();
+    if (newVisitStatus === 'completed' && !completedTime) completedTime = new Date().toISOString();
+    if (newVisitStatus === 'scheduled') { checkInTime = null; completedTime = null; }
+
+    await pool.query(
+      `UPDATE appointments SET
+         client_name = ?, client_phone = ?, client_email = ?,
+         service_name = ?, appointment_date = ?, time_slot = ?,
+         stylist_id = ?, status = ?, visit_status = ?,
+         check_in_time = ?, completed_time = ?,
+         customer_notes = ?, admin_note = ?,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [
+        fitColumnValue('client_name', newName),
+        fitColumnValue('client_phone', newPhone),
+        fitColumnValue('client_email', newEmail),
+        fitColumnValue('service_name', newService),
+        fitColumnValue('appointment_date', newDate),
+        fitColumnValue('time_slot', newTime),
+        newStylistId,
+        newStatus,
+        newVisitStatus,
+        checkInTime,
+        completedTime,
+        fitColumnValue('customer_notes', newCustNotes),
+        fitColumnValue('admin_note', newAdminNote),
+        apt.id
+      ]
+    );
+
+    // If cancelled, notify client and release slot to waiting list
+    if (newStatus === 'cancelled' && apt.status !== 'cancelled') {
+      try { await dispatchNotification(apt, 'cancelled'); } catch (e) {}
+      await releaseSlotToWaitingList(apt.appointment_date, apt.time_slot, apt.stylist_id);
+    } else if (newVisitStatus === 'completed' && apt.visit_status !== 'completed') {
+      try {
+        const [svc] = await pool.query('SELECT price FROM services WHERE service_name = ? LIMIT 1', [newService]);
+        const price = svc.length > 0 ? Number(svc[0].price) : 0;
+        const [crm] = await pool.query('SELECT id FROM clients WHERE phone = ? OR (email IS NOT NULL AND email != "" AND LOWER(email) = LOWER(?)) LIMIT 1', [newPhone, newEmail]);
+        if (crm.length > 0) {
+          await pool.query('UPDATE clients SET total_visits = total_visits + 1, total_spent = total_spent + ?, last_visit_date = ? WHERE id = ?', [price, newDate, crm[0].id]);
+        }
+      } catch (crmErr) {}
+      try { await dispatchNotification(apt, 'review_request'); } catch (e) {}
+    }
+
+    res.json({
+      success: true,
+      message: `Appointment #${apt.booking_code} updated successfully.`,
+      appointment: {
+        id: apt.id,
+        bookingCode: apt.booking_code,
+        name: newName,
+        phone: newPhone,
+        email: newEmail,
+        service: newService,
+        date: newDate,
+        time: newTime,
+        stylistId: newStylistId,
+        status: newStatus,
+        visitStatus: newVisitStatus
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to update appointment.', error: err.message });
+  }
+});
+
 // 6. Delete Individual Appointment Record (Users or Admins)
 app.delete('/api/appointments/:id', optionalToken, async (req, res) => {
   try {
@@ -2474,11 +2645,10 @@ app.get('/api/dispatch/board', requireAdmin, async (req, res) => {
   try {
     if (!pool) return res.status(503).json({ success: false, message: 'Database connection not ready.' });
 
-    const date = (req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) ? req.query.date : null;
-    if (!date) return res.status(400).json({ success: false, message: 'Date parameter (YYYY-MM-DD) is required.' });
+    const date = (req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) ? req.query.date : new Date().toISOString().split('T')[0];
 
     const [stylists] = await pool.query(
-      'SELECT id, name, specialization FROM stylists WHERE is_active = 1 ORDER BY name ASC'
+      'SELECT id, name, specialization, photo_url, phone, email FROM stylists WHERE is_active = 1 ORDER BY id ASC'
     );
 
     const [apts] = await pool.query(
@@ -2488,10 +2658,17 @@ app.get('/api/dispatch/board', requireAdmin, async (req, res) => {
          a.service_name AS service, a.time_slot AS timeSlot,
          a.status, a.visit_status AS visitStatus,
          a.check_in_time AS checkInTime, a.completed_time AS completedTime,
-         a.customer_notes AS customerNotes, a.admin_note AS adminNote
+         a.customer_notes AS customerNotes, a.admin_note AS adminNote,
+         s.price AS servicePrice, s.duration_minutes AS durationMinutes
        FROM appointments a
+       LEFT JOIN services s ON LOWER(s.service_name) = LOWER(a.service_name)
        WHERE a.appointment_date = ? AND a.status != 'cancelled'
-       ORDER BY a.time_slot ASC`,
+       ORDER BY a.time_slot ASC, a.id ASC`,
+      [date]
+    );
+
+    const [cancelledApts] = await pool.query(
+      "SELECT COUNT(*) AS c FROM appointments WHERE appointment_date = ? AND status = 'cancelled'",
       [date]
     );
 
@@ -2501,22 +2678,150 @@ app.get('/api/dispatch/board', requireAdmin, async (req, res) => {
     );
 
     const [offs] = await pool.query(
-      'SELECT t.stylist_id AS stylistId, t.reason FROM stylist_time_offs t WHERE t.off_date = ?',
+      'SELECT t.id, t.stylist_id AS stylistId, t.reason FROM stylist_time_offs t WHERE t.off_date = ?',
       [date]
     );
 
-    const board = stylists.map(s => ({
-      stylistId: s.id,
-      name: s.name,
-      specialization: s.specialization,
-      onDayOff: offs.some(o => o.stylistId === s.id),
-      appointments: apts.filter(a => a.stylistId === s.id),
-      blocks: blocks.filter(b => b.stylistId === s.id)
-    }));
+    const board = stylists.map(s => {
+      const offRecord = offs.find(o => o.stylistId === s.id);
+      return {
+        stylistId: s.id,
+        name: s.name,
+        specialization: s.specialization,
+        photoUrl: s.photo_url || null,
+        phone: s.phone || null,
+        onDayOff: !!offRecord,
+        offReason: offRecord ? offRecord.reason : null,
+        appointments: apts.filter(a => a.stylistId === s.id),
+        blocks: blocks.filter(b => b.stylistId === s.id)
+      };
+    });
 
-    res.json({ success: true, date, board, unassigned: apts.filter(a => !a.stylistId) });
+    const summary = {
+      total: apts.length,
+      scheduled: apts.filter(a => a.visitStatus === 'scheduled').length,
+      checkedIn: apts.filter(a => a.visitStatus === 'checked_in').length,
+      completed: apts.filter(a => a.visitStatus === 'completed').length,
+      noShow: apts.filter(a => a.visitStatus === 'no_show').length,
+      cancelled: cancelledApts[0] ? Number(cancelledApts[0].c) : 0,
+      totalStylists: stylists.length,
+      stylistsOnDuty: stylists.filter(s => !offs.some(o => o.stylistId === s.id)).length
+    };
+
+    res.json({
+      success: true,
+      date,
+      timeSlots: TIME_SLOTS,
+      board,
+      unassigned: apts.filter(a => !a.stylistId),
+      summary
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to build dispatch board.', error: err.message });
+  }
+});
+
+// Drag-to-Reschedule and Drag-to-Reassign (ADMIN ONLY)
+app.patch('/api/dispatch/reassign-reschedule', requireAdmin, async (req, res) => {
+  try {
+    if (!pool) return res.status(503).json({ success: false, message: 'Database connection not ready.' });
+
+    const { id, targetDate, targetSlot, targetStylistId } = req.body;
+    if (!id || !targetDate || !targetSlot) {
+      return res.status(400).json({ success: false, message: 'Appointment id, targetDate, and targetSlot are required.' });
+    }
+
+    const [aptRows] = await pool.query('SELECT * FROM appointments WHERE booking_code = ? OR id = ?', [id, id]);
+    if (aptRows.length === 0) return res.status(404).json({ success: false, message: `Appointment #${id} not found.` });
+    const apt = aptRows[0];
+
+    let stylistId = targetStylistId ? Number(targetStylistId) : apt.stylist_id;
+    let stylistName = 'Stylist';
+
+    if (stylistId) {
+      const [sRows] = await pool.query('SELECT id, name, is_active FROM stylists WHERE id = ?', [stylistId]);
+      if (sRows.length === 0 || !sRows[0].is_active) {
+        return res.status(400).json({ success: false, message: 'Target stylist is inactive or not found.' });
+      }
+      stylistName = sRows[0].name;
+
+      // Check if target stylist is on leave
+      const [offRows] = await pool.query('SELECT id, reason FROM stylist_time_offs WHERE stylist_id = ? AND off_date = ? LIMIT 1', [stylistId, targetDate]);
+      if (offRows.length > 0) {
+        return res.status(409).json({ success: false, message: `${stylistName} is on leave on ${targetDate}${offRows[0].reason ? ` (${offRows[0].reason})` : ''}.` });
+      }
+
+      // Check if target stylist is blocked for this slot
+      const [blockRows] = await pool.query('SELECT id, reason FROM stylist_blocks WHERE stylist_id = ? AND block_date = ? AND time_slot = ? LIMIT 1', [stylistId, targetDate, targetSlot]);
+      if (blockRows.length > 0) {
+        return res.status(409).json({ success: false, message: `${stylistName} has a blocked out time in this slot${blockRows[0].reason ? ` (${blockRows[0].reason})` : ''}.` });
+      }
+
+      // Check if target stylist has a conflicting appointment
+      const [conflict] = await pool.query(
+        "SELECT id, booking_code FROM appointments WHERE stylist_id = ? AND appointment_date = ? AND time_slot = ? AND status != 'cancelled' AND id != ? LIMIT 1",
+        [stylistId, targetDate, targetSlot, apt.id]
+      );
+      if (conflict.length > 0) {
+        return res.status(409).json({ success: false, message: `${stylistName} already has appointment #${conflict[0].booking_code} scheduled in this slot.` });
+      }
+    } else {
+      // Auto-assign
+      const autoStylist = await findAvailableStylist(targetDate, targetSlot);
+      if (!autoStylist) {
+        return res.status(409).json({ success: false, message: 'No available stylist found for the target date and time slot.' });
+      }
+      stylistId = autoStylist.id;
+      stylistName = autoStylist.name;
+    }
+
+    // Check slot capacity limit (max 5)
+    const [countRows] = await pool.query(
+      "SELECT COUNT(*) AS booked FROM appointments WHERE appointment_date = ? AND time_slot = ? AND status != 'cancelled' AND id != ?",
+      [targetDate, targetSlot, apt.id]
+    );
+    if (Number(countRows[0].booked) >= 5) {
+      return res.status(409).json({ success: false, message: 'The target time slot is at maximum capacity (5 separate appointments).' });
+    }
+
+    // Reset visit status if slot or date changed
+    const slotChanged = (apt.appointment_date !== targetDate || apt.time_slot !== targetSlot);
+    const newVisitStatus = slotChanged ? 'scheduled' : apt.visit_status;
+    const checkInTime = slotChanged ? null : apt.check_in_time;
+    const completedTime = slotChanged ? null : apt.completed_time;
+
+    await pool.query(
+      `UPDATE appointments
+       SET appointment_date = ?, time_slot = ?, stylist_id = ?,
+           visit_status = ?, check_in_time = ?, completed_time = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [targetDate, targetSlot, stylistId, newVisitStatus, checkInTime, completedTime, apt.id]
+    );
+
+    // If rescheduled, notify client
+    if (slotChanged) {
+      try {
+        await dispatchNotification({ ...apt, appointment_date: targetDate, time_slot: targetSlot }, 'rescheduled');
+      } catch (e) {}
+      await releaseSlotToWaitingList(apt.appointment_date, apt.time_slot, apt.stylist_id);
+    }
+
+    res.json({
+      success: true,
+      message: `Appointment #${apt.booking_code} successfully scheduled with ${stylistName} for ${targetDate} (${targetSlot}).`,
+      appointment: {
+        id: apt.id,
+        bookingCode: apt.booking_code,
+        stylistId,
+        stylistName,
+        appointmentDate: targetDate,
+        timeSlot: targetSlot,
+        visitStatus: newVisitStatus
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to reschedule/reassign appointment.', error: err.message });
   }
 });
 
@@ -2762,22 +3067,57 @@ app.get('/api/stylists/blocks', requireAdmin, async (req, res) => {
 app.post('/api/stylists/blocks', requireAdmin, async (req, res) => {
   try {
     if (!pool) return res.status(503).json({ success: false, message: 'Database connection not ready.' });
-    const { stylistId, date, timeSlot, reason } = req.body;
-    if (!Number.isInteger(Number(stylistId)) || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !timeSlot) {
-      return res.status(400).json({ success: false, message: 'stylistId, date (YYYY-MM-DD) and timeSlot are required.' });
+    const { stylistId, date, timeSlot, timeSlots, startSlot, endSlot, allDay, reason } = req.body;
+    if (!Number.isInteger(Number(stylistId)) || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ success: false, message: 'Valid stylistId and date (YYYY-MM-DD) are required.' });
     }
     const [stylistRows] = await pool.query('SELECT id, name FROM stylists WHERE id = ? AND is_active = 1', [Number(stylistId)]);
     if (stylistRows.length === 0) return res.status(400).json({ success: false, message: 'Stylist not found or inactive.' });
 
-    // INSERT IGNORE — unique key (stylist_id, block_date, time_slot) makes re-adding idempotent
-    const [result] = await pool.query(
-      'INSERT IGNORE INTO stylist_blocks (stylist_id, block_date, time_slot, reason) VALUES (?, ?, ?, ?)',
-      [Number(stylistId), date, String(timeSlot), (reason || '').trim() || null]
-    );
-    if (result.affectedRows === 0) {
-      return res.json({ success: true, message: 'Block-out already exists for this stylist/slot.', duplicate: true });
+    // Determine target slots to block
+    let targetSlots = [];
+    if (allDay) {
+      targetSlots = [...TIME_SLOTS];
+    } else if (Array.isArray(timeSlots) && timeSlots.length > 0) {
+      targetSlots = timeSlots.filter(t => TIME_SLOTS.includes(t));
+    } else if (startSlot && endSlot) {
+      const startIdx = TIME_SLOTS.indexOf(startSlot);
+      const endIdx = TIME_SLOTS.indexOf(endSlot);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const from = Math.min(startIdx, endIdx);
+        const to = Math.max(startIdx, endIdx);
+        targetSlots = TIME_SLOTS.slice(from, to + 1);
+      } else {
+        targetSlots = [startSlot];
+      }
+    } else if (timeSlot) {
+      targetSlots = [timeSlot];
     }
-    res.status(201).json({ success: true, message: `Block-out added for ${stylistRows[0].name} on ${date} ${timeSlot}.` });
+
+    if (targetSlots.length === 0) {
+      return res.status(400).json({ success: false, message: 'At least one valid time slot, time range, or allDay flag is required.' });
+    }
+
+    const cleanReason = (reason && reason.trim()) ? reason.trim() : 'Staff Unavailable / Break';
+
+    let insertedCount = 0;
+    for (const slot of targetSlots) {
+      const [result] = await pool.query(
+        'INSERT IGNORE INTO stylist_blocks (stylist_id, block_date, time_slot, reason) VALUES (?, ?, ?, ?)',
+        [Number(stylistId), date, String(slot), cleanReason]
+      );
+      if (result.affectedRows > 0) insertedCount++;
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Recorded ${insertedCount > 0 ? insertedCount : targetSlots.length} block-out slot(s) for ${stylistRows[0].name} on ${date}.`,
+      stylistName: stylistRows[0].name,
+      date,
+      slots: targetSlots,
+      reason: cleanReason,
+      insertedCount
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to add block-out.', error: err.message });
   }
@@ -2850,7 +3190,14 @@ app.get('/api/clients', optionalToken, async (req, res) => {
                WHERE (c.phone IS NOT NULL AND c.phone != '' AND a.client_phone = c.phone)
                   OR (c.email IS NOT NULL AND c.email != '' AND LOWER(a.client_email) = LOWER(c.email))
              ), 0)) AS totalVisits,
-             c.total_spent AS totalSpent,
+             COALESCE(NULLIF(c.total_spent, 0), (
+               SELECT COALESCE(SUM(s.price), 0)
+               FROM appointments a
+               JOIN services s ON LOWER(s.service_name) = LOWER(a.service_name)
+               WHERE ((c.phone IS NOT NULL AND c.phone != '' AND a.client_phone = c.phone)
+                  OR (c.email IS NOT NULL AND c.email != '' AND LOWER(a.client_email) = LOWER(c.email)))
+                 AND (a.visit_status = 'completed' OR a.status = 'completed')
+             ), 0) AS totalSpent,
              c.last_visit_date AS lastVisitDate,
              c.created_at AS createdAt
       FROM clients c
@@ -2881,7 +3228,14 @@ app.get('/api/clients/:id', optionalToken, async (req, res) => {
                 WHERE (c.phone IS NOT NULL AND c.phone != '' AND a.client_phone = c.phone)
                    OR (c.email IS NOT NULL AND c.email != '' AND LOWER(a.client_email) = LOWER(c.email))
               ), 0)) AS totalVisits,
-              c.total_spent AS totalSpent,
+              COALESCE(NULLIF(c.total_spent, 0), (
+                SELECT COALESCE(SUM(s.price), 0)
+                FROM appointments a
+                JOIN services s ON LOWER(s.service_name) = LOWER(a.service_name)
+                WHERE ((c.phone IS NOT NULL AND c.phone != '' AND a.client_phone = c.phone)
+                   OR (c.email IS NOT NULL AND c.email != '' AND LOWER(a.client_email) = LOWER(c.email)))
+                  AND (a.visit_status = 'completed' OR a.status = 'completed')
+              ), 0) AS totalSpent,
               c.last_visit_date AS lastVisitDate,
               c.created_at AS createdAt
        FROM clients c WHERE c.id = ?`,
@@ -3017,8 +3371,8 @@ app.post('/api/clients/:id/photos', requireAdmin, async (req, res) => {
   try {
     if (!pool) return res.status(503).json({ success: false, message: 'Database connection not ready.' });
     const { photoUrl, photoType, appointmentId, caption } = req.body;
-    if (!photoUrl || typeof photoUrl !== 'string' || photoUrl.length > 500) {
-      return res.status(400).json({ success: false, message: 'photoUrl (max 500 chars) is required.' });
+    if (!photoUrl || typeof photoUrl !== 'string' || photoUrl.length > 25000000) {
+      return res.status(400).json({ success: false, message: 'Valid photoUrl (URL reference or image data URL up to 25MB) is required.' });
     }
     if (photoType && !['before', 'after'].includes(photoType)) {
       return res.status(400).json({ success: false, message: 'photoType must be before or after.' });
@@ -3782,17 +4136,17 @@ const REMINDER_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 async function sendDueReminders() {
   try {
     if (!pool) return;
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const [apts] = await pool.query(
       `SELECT a.* FROM appointments a
        WHERE a.status = 'confirmed'
          AND a.visit_status = 'scheduled'
-         AND TIMESTAMPDIFF(HOUR, NOW(),
-               STR_TO_DATE(CONCAT(a.appointment_date, ' ', SUBSTRING_INDEX(a.time_slot, ' - ', 1)),
-                           '%Y-%m-%d %h:%i %p')) BETWEEN 23 AND 25
+         AND a.appointment_date = ?
          AND NOT EXISTS (
            SELECT 1 FROM notification_log n
            WHERE n.appointment_id = a.id AND n.type = 'reminder_24h'
-         )`
+         )`,
+      [tomorrow]
     );
     for (const apt of apts) {
       console.log(`[Reminder ⏰] 24h reminder due for ${apt.booking_code} (${apt.appointment_date} ${apt.time_slot})`);

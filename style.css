@@ -431,15 +431,7 @@ button, input, select, textarea {
   white-space: nowrap;
 }
 
-/* ── Mobile 360px — scale circle down proportionally ───────────────── */
-@media (max-width: 360px) {
-  .logo-circle,
-  .logo-img-main {
-    width: 54px;
-    height: 54px;
-  }
-  .brand-name { font-size: 1rem; }
-}
+
 
 /* Navigation Links (Desktop) */
 .nav-menu,
@@ -1541,16 +1533,17 @@ button, input, select, textarea {
 .appointment-form-box {
   background-color: #FFFFFF;
   color: var(--color-text-main);
-  padding: 2.5rem;
+  padding: 2.5rem 2.25rem;
   border-radius: var(--border-radius-md);
   box-shadow: var(--shadow-md);
   position: relative;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
   width: 100%;
 }
@@ -1558,6 +1551,7 @@ button, input, select, textarea {
 .form-group {
   margin-bottom: 1.25rem;
   width: 100%;
+  min-width: 0;
 }
 
 .form-label {
@@ -1574,11 +1568,16 @@ button, input, select, textarea {
 
 .form-input {
   width: 100%;
+  height: 48px;
+  min-height: 48px;
+  line-height: 1.5;
+  box-sizing: border-box;
   padding: 0.75rem 1rem;
   background-color: var(--color-cream);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-sm);
   color: var(--color-dark);
+  font-family: var(--font-sans);
   font-size: 0.9375rem;
   transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
 }
@@ -1608,19 +1607,47 @@ button, input, select, textarea {
 .select-wrapper {
   position: relative;
   width: 100%;
+  min-width: 0;
 }
 
 .form-select {
   appearance: none;
   -webkit-appearance: none;
+  -moz-appearance: none;
   cursor: pointer;
+  padding-right: 2.75rem !important;
+}
+
+/* Consistent Date Input cross-browser normalization */
+input[type="date"].form-input {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  color: var(--color-dark);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+input[type="date"].form-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity 0.2s;
+  padding: 0;
+  margin-right: 2px;
+}
+
+input[type="date"].form-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 .select-wrapper::after {
   content: '';
   position: absolute;
   top: 50%;
-  right: 14px;
+  right: 16px;
   transform: translateY(-50%);
   width: 0;
   height: 0;
@@ -1630,9 +1657,59 @@ button, input, select, textarea {
   pointer-events: none;
 }
 
+/* Professional Time Slot Selection Dropdown & Option Alignment */
+.time-slot-select,
+#preferredTime {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.time-slot-select optgroup,
+#preferredTime optgroup {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-primary-dark);
+  background-color: #FAF7F2;
+  padding: 8px 12px 6px;
+  font-style: normal;
+}
+
+.time-slot-select option,
+#preferredTime option {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: 0.02em;
+  color: var(--color-dark);
+  background-color: #FFFFFF;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+
+.time-slot-select option[disabled],
+#preferredTime option[disabled],
+.time-slot-select option[data-booked="true"],
+#preferredTime option[data-booked="true"] {
+  color: #B91C1C !important;
+  background-color: #FFF1F2 !important;
+  font-weight: 600;
+  cursor: not-allowed;
+}
+
 .form-textarea {
-  resize: vertical;
+  height: auto;
   min-height: 80px;
+  resize: vertical;
 }
 
 /* Appointment Form Submit Button — Proportional Sizing Override */
@@ -2335,13 +2412,95 @@ button, input, select, textarea {
     display: none; /* Clean mobile header */
   }
 
+  .site-header {
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+  }
+
   .header-container {
-    height: 70px;
+    height: 64px;
+    padding-left: clamp(10px, 2.5vw, 18px) !important;
+    padding-right: clamp(10px, 2.5vw, 18px) !important;
+    gap: 0.5rem;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+  }
+
+  /* Compact Brand Logo for 768px */
+  .brand-logo {
+    gap: 0.55rem;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .logo-circle {
+    width: 46px;
+    height: 46px;
+    box-shadow:
+      0 0 0 1.5px #C5A880,
+      0 0 0 3px rgba(197, 168, 128, 0.18),
+      0 2px 8px rgba(197, 168, 128, 0.22);
+  }
+
+  .logo-text {
+    min-width: 0;
+  }
+
+  .brand-name {
+    font-size: 1.08rem;
+    letter-spacing: -0.01em;
+  }
+
+  .brand-sub {
+    font-size: 0.52rem;
+    letter-spacing: 0.12em;
+  }
+
+  /* Compact Header Action Buttons for 768px */
+  .header-actions {
+    gap: 0.45rem;
+    flex-shrink: 0;
+    align-items: center;
+  }
+
+  .auth-btn-group {
+    gap: 0.35rem;
+  }
+
+  .btn-nav-login {
+    padding: 0.42rem 0.85rem;
+    font-size: 0.8125rem;
+    border-width: 1px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .btn-nav-signup {
+    padding: 0.42rem 0.95rem;
+    font-size: 0.8125rem;
+    border-width: 1px;
+    line-height: 1.2;
+    white-space: nowrap;
+    box-shadow: 0 2px 10px rgba(197, 168, 128, 0.28);
+  }
+
+  .btn-nav-user,
+  .btn-nav-admin {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.775rem;
+  }
+
+  .btn-nav-logout {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.75rem;
   }
 
   /* Mobile Hamburger Toggle */
   .mobile-toggle {
     display: flex;
+    width: 26px;
+    height: 18px;
+    margin-left: 2px;
   }
 
   .btn-nav {
@@ -2670,7 +2829,74 @@ button, input, select, textarea {
   }
 
   :root {
-    --container-padding: 1.125rem;
+    --container-padding: 0.875rem;
+  }
+
+  /* Compact Header for 480px Mobile */
+  .site-header {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .header-container {
+    height: 58px;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    gap: 0.35rem;
+  }
+
+  .brand-logo {
+    gap: 0.45rem;
+  }
+
+  .logo-circle {
+    width: 38px;
+    height: 38px;
+  }
+
+  .brand-name {
+    font-size: 0.95rem;
+  }
+
+  .brand-sub {
+    font-size: 0.46rem;
+    letter-spacing: 0.08em;
+  }
+
+  .header-actions {
+    gap: 0.35rem;
+  }
+
+  .auth-btn-group {
+    gap: 0.28rem;
+  }
+
+  .btn-nav-login {
+    padding: 0.35rem 0.68rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.01em;
+  }
+
+  .btn-nav-signup {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.01em;
+  }
+
+  .btn-nav-user,
+  .btn-nav-admin {
+    padding: 0.34rem 0.65rem;
+    font-size: 0.725rem;
+  }
+
+  .btn-nav-logout {
+    padding: 0.34rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .mobile-toggle {
+    width: 24px;
+    height: 17px;
   }
 
   .hero-title {
@@ -2748,6 +2974,57 @@ button, input, select, textarea {
 
 /* 360px & Below: Small Mobile Devices */
 @media (max-width: 360px) {
+  .header-container {
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+    gap: 0.25rem;
+  }
+
+  .brand-logo {
+    gap: 0.35rem;
+  }
+
+  .logo-circle {
+    width: 32px;
+    height: 32px;
+  }
+
+  .brand-name {
+    font-size: 0.85rem;
+  }
+
+  .brand-sub {
+    display: none;
+  }
+
+  .header-actions {
+    gap: 0.25rem;
+  }
+
+  .auth-btn-group {
+    gap: 0.22rem;
+  }
+
+  .btn-nav-login {
+    padding: 0.3rem 0.52rem;
+    font-size: 0.7rem;
+  }
+
+  .btn-nav-signup {
+    padding: 0.3rem 0.58rem;
+    font-size: 0.7rem;
+  }
+
+  .btn-nav-user,
+  .btn-nav-admin {
+    padding: 0.3rem 0.55rem;
+    font-size: 0.68rem;
+  }
+
+  .mobile-toggle {
+    width: 22px;
+    height: 15px;
+  }
 
   .hero-title {
     font-size: 1.85rem;
@@ -6871,4 +7148,41 @@ button, input, select, textarea {
     border: none !important;
   }
 }
+/* Mobile responsive fix for appointment form buttons */
+@media screen and (max-width: 768px) {
+    .button-group, .form-actions, .appointment-actions {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+    
+    .button-group button, .form-actions button, 
+    .button-group a, .form-actions a,
+    .btn-whatsapp-direct {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        text-align: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
+    }
+}
+/* Mobile responsive fix for header login and sign up buttons */
+@media screen and (max-width: 768px) {
+    .header, header, .navbar {
+        flex-wrap: wrap !important;
+        padding: 10px !important;
+    }
+    
+    .auth-buttons, .header-buttons, .nav-buttons {
+        display: flex !important;
+        gap: 8px !important;
+        align-items: center !important;
+    }
 
+    .auth-buttons a, .auth-buttons button, 
+    .header-buttons a, .header-buttons button {
+        padding: 6px 12px !important;
+        font-size: 14px !important;
+    }
+}

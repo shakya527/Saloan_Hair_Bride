@@ -133,6 +133,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const formSuccessMessage = document.getElementById('formSuccessMessage');
   const feedbackClientName = document.getElementById('feedbackClientName');
   const btnResetForm = document.getElementById('btnResetForm');
+  const btnExitConfirmation = document.getElementById('btnExitConfirmation');
+  const btnClientPortalLogout = document.getElementById('btnClientPortalLogout') || document.getElementById('btnClientLogout');
 
   const inputName = document.getElementById('fullName');
   const inputPhone = document.getElementById('phoneNumber');
@@ -147,6 +149,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const errorEmail = document.getElementById('emailError');
   const errorService = document.getElementById('serviceError');
   const errorDate = document.getElementById('dateError');
+  const errorTime = document.getElementById('timeError');
+
+  // Helper to normalize time slot string for robust comparison
+  function normalizeSlotTime(t) {
+    if (!t) return '';
+    return String(t)
+      .toLowerCase()
+      .replace(/\b0(\d:)/g, '$1')
+      .replace(/\s+/g, ' ')
+      .replace(/[–—]/g, '-')
+      .trim();
+  }
 
   // Set minimum booking date to today
   if (inputDate) {
@@ -163,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ? 'http://localhost:5000/api'
     : '/api';
 
-  // Real-time slot availability check: queries database API for booked slots on selected date
+  // Real-time slot availability check: queries database API and local bookings for booked slots on selected date
   async function updateAvailableSlots() {
     if (!inputDate || !selectTime) return;
     const selectedDate = inputDate.value;
@@ -189,6 +203,18 @@ document.addEventListener('DOMContentLoaded', () => {
         .map(apt => apt.time);
     }
 
+    // Always merge stored local appointments for this date to ensure full consistency
+    try {
+      const localAppointments = getStoredAppointments();
+      localAppointments
+        .filter(apt => apt.date === selectedDate && apt.status !== 'cancelled')
+        .forEach(apt => {
+          if (!bookedTimes.some(b => normalizeSlotTime(b) === normalizeSlotTime(apt.time))) {
+            bookedTimes.push(apt.time);
+          }
+        });
+    } catch (e) {}
+
     const options = selectTime.querySelectorAll('option');
     options.forEach(opt => {
       if (!opt.value) return; // Skip placeholder
@@ -196,69 +222,72 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!opt.getAttribute('data-base-time')) {
         opt.setAttribute('data-base-time', baseTime);
       }
+      const rawText = opt.textContent;
+      const baseLabel = opt.getAttribute('data-base-label') || rawText.replace(/\s*(\(Reserved\)|- Reserved|\(Book Unavailable\)|- Book Unavailable|\(Fully Booked[^)]*\))/gi, '').trim();
+      if (!opt.getAttribute('data-base-label')) {
+        opt.setAttribute('data-base-label', baseLabel);
+      }
 
-      if (bookedTimes.includes(baseTime)) {
-        opt.disabled = false;
+      const isBooked = bookedTimes.some(b => {
+        return b === baseTime || b === baseLabel ||
+               normalizeSlotTime(b) === normalizeSlotTime(baseTime) ||
+               normalizeSlotTime(b) === normalizeSlotTime(baseLabel);
+      });
+
+      if (isBooked) {
+        opt.disabled = true;
+        opt.setAttribute('disabled', 'disabled');
         opt.setAttribute('data-booked', 'true');
-        opt.textContent = `${baseTime} (Fully Booked — Join Waiting List)`;
-        opt.style.color = '#B45309';
-        opt.style.backgroundColor = '#FEF3C7';
+        opt.textContent = `${baseLabel} - Reserved`;
+        opt.style.color = '#B91C1C';
+        opt.style.backgroundColor = '#FFF1F2';
         opt.style.fontWeight = '600';
+        opt.style.cursor = 'not-allowed';
       } else {
         opt.disabled = false;
+        opt.removeAttribute('disabled');
         opt.removeAttribute('data-booked');
-        opt.textContent = baseTime;
+        opt.textContent = baseLabel;
         opt.style.color = '';
         opt.style.backgroundColor = '';
         opt.style.fontWeight = '';
+        opt.style.cursor = '';
       }
     });
 
-    // Dynamic banner below time slot selector when booked slots exist
-    let wlNotice = document.getElementById('waitingListSlotNotice');
-    if (!wlNotice && selectTime && selectTime.parentNode) {
-      wlNotice = document.createElement('div');
-      wlNotice.id = 'waitingListSlotNotice';
-      wlNotice.className = 'waiting-list-slot-notice';
-      selectTime.parentNode.parentNode.appendChild(wlNotice);
-    }
-    if (wlNotice) {
-      if (bookedTimes.length > 0) {
-        wlNotice.style.display = 'block';
-        wlNotice.innerHTML = `
-          <div class="wl-notice-badge">
-            <span class="wl-notice-dot"></span>
-            <span>Looking for a fully booked slot? <button type="button" class="btn-link-wl" id="btnOpenWlModal">Join Priority Waiting List</button></span>
-          </div>
-        `;
-        const btnWl = wlNotice.querySelector('#btnOpenWlModal');
-        if (btnWl) {
-          btnWl.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (typeof openWaitingListModal === 'function') {
-              openWaitingListModal({
-                date: selectedDate,
-                slot: bookedTimes[0] || '',
-                serviceName: selectService ? selectService.value : '',
-                name: inputName ? inputName.value.trim() : '',
-                phone: inputPhone ? inputPhone.value.trim() : '',
-                email: inputEmail ? inputEmail.value.trim() : ''
-              });
-            }
-          });
+    // If currently selected slot became unavailable, clear selection and notify customer
+    if (selectTime.value) {
+      const currentSelectedOpt = selectTime.options[selectTime.selectedIndex];
+      if (currentSelectedOpt && (currentSelectedOpt.disabled || currentSelectedOpt.getAttribute('data-booked') === 'true')) {
+        selectTime.value = '';
+        selectTime.classList.add('is-invalid');
+        if (errorTime) {
+          errorTime.textContent = 'The selected time slot is Reserved. Please choose another time slot.';
+          errorTime.classList.add('visible');
         }
-      } else {
-        wlNotice.style.display = 'none';
       }
+    }
+
+    // Clean up any extraneous notice to keep Preferred Time field pristine and aligned
+    const wlNotice = document.getElementById('waitingListSlotNotice');
+    if (wlNotice) {
+      wlNotice.remove();
     }
   }
 
   if (selectTime) {
     selectTime.addEventListener('change', () => {
       const selectedOpt = selectTime.options[selectTime.selectedIndex];
-      if (selectedOpt && selectedOpt.getAttribute('data-booked') === 'true') {
+      const isBooked = selectedOpt && (selectedOpt.disabled || selectedOpt.getAttribute('data-booked') === 'true');
+      if (isBooked) {
         const baseTime = selectedOpt.getAttribute('data-base-time') || selectedOpt.value;
         const curDate = inputDate ? inputDate.value : '';
+        selectTime.value = '';
+        selectTime.classList.add('is-invalid');
+        if (errorTime) {
+          errorTime.textContent = 'This time slot is Reserved. Please choose another time slot.';
+          errorTime.classList.add('visible');
+        }
         if (typeof openWaitingListModal === 'function') {
           openWaitingListModal({
             date: curDate,
@@ -269,13 +298,21 @@ document.addEventListener('DOMContentLoaded', () => {
             email: inputEmail ? inputEmail.value.trim() : ''
           });
         }
-        selectTime.value = '';
+      } else if (selectTime.value) {
+        selectTime.classList.remove('is-invalid');
+        if (errorTime) {
+          errorTime.classList.remove('visible');
+        }
       }
     });
   }
 
   if (inputDate) {
     inputDate.addEventListener('change', updateAvailableSlots);
+    inputDate.addEventListener('input', updateAvailableSlots);
+  }
+  if (selectService) {
+    selectService.addEventListener('change', updateAvailableSlots);
   }
 
   // Real-time error clearing on user input
@@ -322,6 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupInputValidation(inputEmail, errorEmail, isValidEmail);
   setupInputValidation(selectService, errorService, isValidService);
   setupInputValidation(inputDate, errorDate, isValidDate);
+  setupInputValidation(selectTime, errorTime, val => val !== '' && !(selectTime.options[selectTime.selectedIndex]?.disabled));
 
   if (appointmentForm) {
     appointmentForm.addEventListener('submit', (e) => {
@@ -393,6 +431,30 @@ document.addEventListener('DOMContentLoaded', () => {
         errorDate.classList.remove('visible');
       }
 
+      // Validate Preferred Time Slot
+      const timeVal = selectTime ? selectTime.value : '';
+      const selectedTimeOpt = selectTime && selectTime.selectedIndex >= 0 ? selectTime.options[selectTime.selectedIndex] : null;
+      const isSelectedBooked = selectedTimeOpt && (selectedTimeOpt.disabled || selectedTimeOpt.getAttribute('data-booked') === 'true');
+
+      if (!timeVal) {
+        if (selectTime) selectTime.classList.add('is-invalid');
+        if (errorTime) {
+          errorTime.textContent = 'Please select an appointment time slot.';
+          errorTime.classList.add('visible');
+        }
+        isValid = false;
+      } else if (isSelectedBooked) {
+        if (selectTime) selectTime.classList.add('is-invalid');
+        if (errorTime) {
+          errorTime.textContent = 'This time slot is Reserved. Please select an available slot.';
+          errorTime.classList.add('visible');
+        }
+        isValid = false;
+      } else {
+        if (selectTime) selectTime.classList.remove('is-invalid');
+        if (errorTime) errorTime.classList.remove('visible');
+      }
+
       // If valid, submit appointment request
       if (isValid) {
         const loggedInUser = getCurrentUser();
@@ -403,11 +465,12 @@ document.addEventListener('DOMContentLoaded', () => {
           email: emailVal,
           service: serviceVal,
           date: dateVal,
-          time: (selectTime && selectTime.value) ? selectTime.value : '09:00 AM - 09:45 AM',
+          time: timeVal,
           message: inputMessage ? (inputMessage.value.trim() || 'None') : 'None'
         };
 
         const newApt = createNewAppointment(appointmentData);
+        if (!newApt) return;
 
         // Show customer live tracking feedback
         renderCustomerConfirmation(newApt);
@@ -1094,20 +1157,109 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Logout Handlers
-  if (btnNavLogout) {
-    btnNavLogout.addEventListener('click', () => {
+  // --------------------------------------------------------------------------
+  // LOGOUT & CLEAN EXIT TO HOME
+  // Completely purges all local storage and session states, resets booking forms,
+  // closes all active modals, and cleanly redirects user back to index.html
+  // --------------------------------------------------------------------------
+  function performLogoutAndExitToHome(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    try {
+      // 1. Clear user & admin memory states
       setCurrentUser(null);
-      clearAuthForms();
-      showAdminToast('Signed Out', 'You have been logged out.');
-    });
+      clearAdminSession();
+      if (typeof clearAuthForms === 'function') clearAuthForms();
+
+      // 2. Clear session storage completely
+      try {
+        sessionStorage.removeItem(ACTIVE_BOOKING_KEY);
+        sessionStorage.clear();
+      } catch (err) {}
+
+      // 3. Clear user session & authentication keys from localStorage
+      try {
+        localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+        localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+        localStorage.removeItem(ADMIN_TOKEN_KEY);
+        localStorage.removeItem('salon_auth_token');
+        localStorage.removeItem('salon_active_booking_id');
+        localStorage.removeItem(ACTIVE_BOOKING_KEY);
+      } catch (err) {}
+
+      // 4. Reset booking form
+      if (appointmentForm) {
+        appointmentForm.reset();
+        appointmentForm.style.display = 'block';
+        appointmentForm.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+        appointmentForm.querySelectorAll('.form-error.visible').forEach(el => el.classList.remove('visible'));
+      }
+
+      // 5. Hide appointment confirmation / success view
+      if (formSuccessMessage) {
+        formSuccessMessage.classList.remove('show', 'is-confirmed');
+      }
+
+      // 6. Close all open overlays & dialogs
+      if (typeof closeClientBookingsModal === 'function') closeClientBookingsModal();
+      if (typeof closeAdminModal === 'function') closeAdminModal();
+      if (typeof closeAuthModal === 'function') closeAuthModal();
+      if (typeof closeInvoiceModal === 'function') closeInvoiceModal();
+      if (typeof closeWaitingListModal === 'function') closeWaitingListModal();
+      if (typeof closeMobileNav === 'function') closeMobileNav();
+
+      document.querySelectorAll('.client-modal-overlay.show, .admin-modal-overlay.show, .auth-modal-overlay.show, .lightbox-modal.show').forEach(m => {
+        m.classList.remove('show');
+        m.setAttribute('aria-hidden', 'true');
+      });
+      document.body.style.overflow = '';
+
+      // 7. Update navbar authentication state
+      updateNavAuthState();
+
+      if (typeof showToast === 'function') {
+        showToast('Logged Out', 'You have been logged out and redirected to Home.');
+      } else if (typeof showAdminToast === 'function') {
+        showAdminToast('Signed Out', 'You have been logged out and redirected to Home.');
+      }
+    } catch (err) {
+      console.warn('Error during logout / exit to home:', err);
+    }
+
+    // 8. Redirect the user cleanly back to the home view (index.html)
+    setTimeout(() => {
+      try {
+        const isIndex = (window.location.pathname.endsWith('index.html') || window.location.pathname.endsWith('/')) && !window.location.hash && !window.location.search;
+        if (isIndex) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          window.location.reload();
+        } else {
+          window.location.href = 'index.html';
+        }
+      } catch (err) {
+        window.location.href = 'index.html';
+      }
+    }, 120);
+  }
+
+  // Expose globally
+  window.performLogoutAndExitToHome = performLogoutAndExitToHome;
+
+  // Logout & Exit Handlers
+  if (btnExitConfirmation) {
+    btnExitConfirmation.addEventListener('click', performLogoutAndExitToHome);
+  }
+  if (btnClientPortalLogout) {
+    btnClientPortalLogout.addEventListener('click', performLogoutAndExitToHome);
+  }
+  if (btnNavLogout) {
+    btnNavLogout.addEventListener('click', performLogoutAndExitToHome);
   }
 
   function handleAdminLogout() {
     clearAdminSession();
     clearAuthForms(); // Auto-clear admin credentials upon locking/logging out
     closeAdminModal();
-    showAdminToast('Admin Locked', 'Admin session has been locked and signed out.');
+    performLogoutAndExitToHome();
   }
 
   if (btnNavAdminLogout) btnNavAdminLogout.addEventListener('click', handleAdminLogout);
@@ -1276,7 +1428,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           ` : ''}
           ${statusTimelineHtml}
-          <div style="margin-top: 0.85rem; padding-top: 0.65rem; border-top: 1px dashed rgba(197, 168, 128, 0.35); display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+          <div style="margin-top: 0.85rem; padding-top: 0.65rem; border-top: 1px dashed rgba(197, 168, 128, 0.35); display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; align-items: center;">
             ${isCompleted ? `
               <button type="button" class="btn-client-view-invoice btn-client-rate-visit" data-booking="${escapeHtml(apt.id)}">
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="none" style="vertical-align: -1px; margin-right: 4px;">
@@ -1294,6 +1446,20 @@ document.addEventListener('DOMContentLoaded', () => {
               </svg>
               View Invoice / Receipt
             </button>
+            ${!isCancelled && !isCompleted ? `
+              <button type="button" class="btn-client-edit-booking" data-booking="${escapeHtml(apt.id)}" style="display:inline-flex; align-items:center; gap:4px; padding:5px 12px; font-size:0.8rem; border-radius:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:600; cursor:pointer;" title="Reschedule or update booking">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Edit
+              </button>
+              <button type="button" class="btn-client-cancel-booking" data-booking="${escapeHtml(apt.id)}" style="display:inline-flex; align-items:center; gap:4px; padding:5px 12px; font-size:0.8rem; border-radius:6px; background:#fff1f2; color:#be123c; border:1px solid #fecdd3; font-weight:600; cursor:pointer;" title="Cancel reservation">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                Cancel
+              </button>
+            ` : ''}
+            <button type="button" class="btn-client-delete-booking" data-booking="${escapeHtml(apt.id)}" style="display:inline-flex; align-items:center; gap:4px; padding:5px 10px; font-size:0.8rem; border-radius:6px; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; font-weight:600; cursor:pointer;" title="Delete booking record">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Delete
+            </button>
           </div>
         </div>
       `;
@@ -1308,6 +1474,56 @@ document.addEventListener('DOMContentLoaded', () => {
           window.openFeedbackModal(bookingId);
         } else {
           window.location.hash = '#review-section?code=' + encodeURIComponent(bookingId);
+        }
+      });
+    });
+
+    // Attach click listeners for Edit buttons in client portal
+    clientBookingsList.querySelectorAll('.btn-client-edit-booking').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bookingId = btn.getAttribute('data-booking');
+        const apt = userAppointments.find(a => String(a.id) === String(bookingId));
+        if (apt && typeof window.openAdminEditAppointmentModal === 'function') {
+          window.openAdminEditAppointmentModal(apt);
+        } else if (apt) {
+          const newDate = prompt('Enter new preferred date (YYYY-MM-DD):', apt.date);
+          if (!newDate) return;
+          const newTime = prompt('Enter new time slot:', apt.time);
+          if (!newTime) return;
+          const allList = getStoredAppointments();
+          const target = allList.find(x => String(x.id) === String(bookingId));
+          if (target) {
+            target.date = newDate;
+            target.time = newTime;
+            target.updatedAt = new Date().toISOString();
+            saveAppointments(allList, true);
+            renderClientBookings(user);
+            showToast('Reservation Updated', `Your booking #${bookingId} has been rescheduled.`);
+          }
+        }
+      });
+    });
+
+    // Attach click listeners for Cancel buttons in client portal
+    clientBookingsList.querySelectorAll('.btn-client-cancel-booking').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const bookingId = btn.getAttribute('data-booking');
+        if (confirm(`Are you sure you want to cancel appointment #${bookingId}?`)) {
+          await updateAppointmentStatus(bookingId, 'cancelled', 'Cancelled by customer via client portal.');
+          renderClientBookings(user);
+          showToast('Reservation Cancelled', `Your booking #${bookingId} has been cancelled.`);
+        }
+      });
+    });
+
+    // Attach click listeners for Delete buttons in client portal
+    clientBookingsList.querySelectorAll('.btn-client-delete-booking').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const bookingId = btn.getAttribute('data-booking');
+        if (confirm(`Delete appointment #${bookingId} from your records?`)) {
+          await deleteAppointment(bookingId);
+          renderClientBookings(user);
+          showToast('Record Removed', `Booking #${bookingId} removed.`);
         }
       });
     });
@@ -1757,6 +1973,18 @@ document.addEventListener('DOMContentLoaded', () => {
   // Create appointment on Customer Form submit
   function createNewAppointment(data) {
     const list = getStoredAppointments();
+
+    // Prevent booking unavailable slots
+    const isSlotAlreadyBooked = list.some(apt => apt.date === data.date && normalizeSlotTime(apt.time) === normalizeSlotTime(data.time) && apt.status !== 'cancelled');
+    if (isSlotAlreadyBooked) {
+      if (typeof showToast === 'function') {
+        showToast('Slot Reserved', 'This time slot is already Reserved. Please choose an available slot.');
+      } else if (typeof showAdminToast === 'function') {
+        showAdminToast('Slot Reserved', 'This time slot is already Reserved. Please choose an available slot.');
+      }
+      return null;
+    }
+
     const newApt = {
       id: 'APT-' + Math.floor(10000 + Math.random() * 90000),
       userId: data.userId || null,
@@ -2115,9 +2343,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
               `}
             </div>
-            <div class="card-actions-right">
-              <button type="button" class="btn-admin-action btn-danger-ghost" data-action="delete" title="Delete record">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <div class="card-actions-right" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="btn-admin-action btn-edit-booking" data-action="edit" title="Edit appointment details" style="display:inline-flex; align-items:center; gap:4px; padding:6px 12px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; font-weight:600; font-size:0.8rem; cursor:pointer;">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <span>Edit</span>
+              </button>
+              ${!isCancelled ? `
+                <button type="button" class="btn-admin-action btn-cancel-booking" data-action="cancel" title="Cancel this appointment" style="display:inline-flex; align-items:center; gap:4px; padding:6px 12px; background:#fff1f2; color:#be123c; border:1px solid #fecdd3; border-radius:6px; font-weight:600; font-size:0.8rem; cursor:pointer;">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                  <span>Cancel</span>
+                </button>
+              ` : `
+                <button type="button" class="btn-admin-action btn-reopen-booking" data-action="re-pending" title="Reopen booking request" style="display:inline-flex; align-items:center; gap:4px; padding:6px 12px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; border-radius:6px; font-weight:600; font-size:0.8rem; cursor:pointer;">
+                  <span>Reopen</span>
+                </button>
+              `}
+              <button type="button" class="btn-admin-action btn-danger-ghost btn-delete-booking" data-action="delete" title="Delete record" style="display:inline-flex; align-items:center; gap:4px; padding:6px 10px; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; border-radius:6px; font-weight:600; font-size:0.8rem; cursor:pointer;">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <span>Delete</span>
               </button>
             </div>
           </div>
@@ -2212,13 +2455,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Revert button
-      const revertBtn = card.querySelector('[data-action="re-pending"]');
-      if (revertBtn) {
+      card.querySelectorAll('[data-action="re-pending"]').forEach(revertBtn => {
         revertBtn.addEventListener('click', () => {
           updateAppointmentStatus(aptId, 'pending', '');
           showAdminToast('Status Updated', `Booking #${aptId} reverted to Pending.`);
         });
-      }
+      });
 
       // Save note button
       const saveNoteBtn = card.querySelector('[data-action="save-note"]');
@@ -2230,9 +2472,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
 
-      // Cancel button
-      const cancelBtn = card.querySelector('[data-action="cancel"]');
-      if (cancelBtn) {
+      // Edit button (opens Admin Edit Appointment Modal)
+      card.querySelectorAll('[data-action="edit"]').forEach(editBtn => {
+        editBtn.addEventListener('click', () => {
+          const list = getStoredAppointments();
+          const targetApt = list.find(a => String(a.id) === String(aptId));
+          if (targetApt && typeof window.openAdminEditAppointmentModal === 'function') {
+            window.openAdminEditAppointmentModal(targetApt);
+          } else if (targetApt) {
+            const newDate = prompt('Update appointment date (YYYY-MM-DD):', targetApt.date);
+            if (!newDate) return;
+            const newTime = prompt('Update time slot:', targetApt.time);
+            if (!newTime) return;
+            targetApt.date = newDate;
+            targetApt.time = newTime;
+            targetApt.updatedAt = new Date().toISOString();
+            saveAppointments(list, true);
+            renderAdminDashboard();
+            showAdminToast('Appointment Updated', `Booking #${aptId} rescheduled.`);
+          }
+        });
+      });
+
+      // Cancel button (handles both left decline and right cancel next to delete)
+      card.querySelectorAll('[data-action="cancel"]').forEach(cancelBtn => {
         cancelBtn.addEventListener('click', async () => {
           const customNote = (noteInput && noteInput.value.trim())
             ? noteInput.value.trim()
@@ -2245,18 +2508,17 @@ document.addEventListener('DOMContentLoaded', () => {
             showAdminToast('Appointment Cancelled', `Booking #${aptId} marked as unavailable.`);
           }
         });
-      }
+      });
 
       // Delete button
-      const deleteBtn = card.querySelector('[data-action="delete"]');
-      if (deleteBtn) {
+      card.querySelectorAll('[data-action="delete"]').forEach(deleteBtn => {
         deleteBtn.addEventListener('click', () => {
           if (confirm('Are you sure you want to delete appointment #' + aptId + '?')) {
             deleteAppointment(aptId);
             showAdminToast('Appointment Deleted', `Record #${aptId} removed.`);
           }
         });
-      }
+      });
     });
   }
 
@@ -2583,7 +2845,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Real-time synchronization events (Local & Cross-tab)
-  window.addEventListener('salon:appointments_changed', () => {
+  const syncAllAppointmentViews = () => {
     updateAdminBadges();
     if (adminModalOverlay && adminModalOverlay.classList.contains('show')) {
       renderAdminDashboard();
@@ -2594,7 +2856,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (user && clientBookingsModalOverlay && clientBookingsModalOverlay.classList.contains('show')) {
       renderClientBookings(user);
     }
-  });
+  };
+
+  window.addEventListener('salon:appointments_changed', syncAllAppointmentViews);
+  window.addEventListener('salon:appointment_updated', syncAllAppointmentViews);
 
   window.addEventListener('storage', (e) => {
     if (e.key === APPOINTMENTS_STORAGE_KEY) {
@@ -2670,10 +2935,20 @@ function sendFormDirectToWhatsApp() {
         let time = document.getElementById("preferredTime") ? document.getElementById("preferredTime").value : "";
         let messageText = document.getElementById("bookingMessage") ? document.getElementById("bookingMessage").value.trim() : "";
 
-        if (!name || !phone || !service || !date) {
-            alert("place Enter Name, Phone Number, Service and  Preferred Date .");
+        if (!name || !phone || !service || !date || !time) {
+            alert("Please enter Name, Phone Number, Service, Preferred Date, and Time.");
             return;
         }
+
+        try {
+            const rawAppointments = localStorage.getItem('salon_hair_bird_appointments');
+            const appts = rawAppointments ? JSON.parse(rawAppointments) : [];
+            const isBooked = appts.some(apt => apt.date === date && String(apt.time).trim().toLowerCase() === String(time).trim().toLowerCase() && apt.status !== 'cancelled');
+            if (isBooked) {
+                alert("The selected time slot is Reserved. Please select an available slot.");
+                return;
+            }
+        } catch (e) {}
 
         let salonNumber = "94720638733"; 
 
@@ -2920,4 +3195,4 @@ if (publicWaitingListForm) {
       if (submitBtn) submitBtn.disabled = false;
     }
   });
-}
+}

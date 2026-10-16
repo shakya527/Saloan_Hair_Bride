@@ -783,7 +783,14 @@
               </div>
 
               <div class="feedback-actions">
-                <button type="button" class="btn btn-secondary btn-sm" id="btnResetForm">Book Another Appointment</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btnResetForm">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  <span>Book Another Appointment</span>
+                </button>
+                <button type="button" class="btn btn-logout-exit btn-sm" id="btnExitConfirmation" title="Log Out &amp; Exit to Home">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                  <span>Log Out / Exit to Home</span>
+                </button>
               </div>
             </div>
 
@@ -840,30 +847,31 @@
 
                 <!-- Preferred Time -->
                 <div class="form-group">
-                  <label for="preferredTime" class="form-label">Preferred Time</label>
+                  <label for="preferredTime" class="form-label">Preferred Time <span class="required">*</span></label>
                   <div class="select-wrapper">
-                    <select id="preferredTime" name="preferredTime" class="form-input form-select">
+                    <select id="preferredTime" name="preferredTime" class="form-input form-select time-slot-select" required>
                       <option value="" disabled selected>Select Time</option>
-                      <optgroup label="Morning Slots (9:00 AM – 12:00 PM)">
-                        <option value="09:00 AM - 09:45 AM">9:00 AM - 9:45 AM</option>
-                        <option value="09:45 AM - 10:30 AM">9:45 AM - 10:30 AM</option>
+                      <optgroup label="Morning Sessions (9:00 AM – 12:00 PM)">
+                        <option value="09:00 AM - 09:45 AM">09:00 AM - 09:45 AM</option>
+                        <option value="09:45 AM - 10:30 AM">09:45 AM - 10:30 AM</option>
                         <option value="10:30 AM - 11:15 AM">10:30 AM - 11:15 AM</option>
                         <option value="11:15 AM - 12:00 PM">11:15 AM - 12:00 PM</option>
                       </optgroup>
-                      <optgroup label="Evening Slots (12:45 PM – 8:00 PM)">
-                        <option value="12:45 PM - 01:30 PM">12:45 PM - 1:30 PM</option>
-                        <option value="01:30 PM - 02:15 PM">1:30 PM - 2:15 PM</option>
-                        <option value="02:15 PM - 03:00 PM">2:15 PM - 3:00 PM</option>
-                        <option value="03:00 PM - 03:45 PM">3:00 PM - 3:45 PM</option>
-                        <option value="03:45 PM - 04:30 PM">3:45 PM - 4:30 PM</option>
-                        <option value="04:30 PM - 05:15 PM">4:30 PM - 5:15 PM</option>
-                        <option value="05:15 PM - 06:00 PM">5:15 PM - 6:00 PM</option>
-                        <option value="06:00 PM - 06:45 PM">6:00 PM - 6:45 PM</option>
-                        <option value="06:45 PM - 07:30 PM">6:45 PM - 7:30 PM</option>
-                        <option value="07:15 PM - 08:00 PM">7:15 PM - 8:00 PM</option>
+                      <optgroup label="Evening Sessions (12:45 PM – 8:00 PM)">
+                        <option value="12:45 PM - 01:30 PM">12:45 PM - 01:30 PM</option>
+                        <option value="01:30 PM - 02:15 PM">01:30 PM - 02:15 PM</option>
+                        <option value="02:15 PM - 03:00 PM">02:15 PM - 03:00 PM</option>
+                        <option value="03:00 PM - 03:45 PM">03:00 PM - 03:45 PM</option>
+                        <option value="03:45 PM - 04:30 PM">03:45 PM - 04:30 PM</option>
+                        <option value="04:30 PM - 05:15 PM">04:30 PM - 05:15 PM</option>
+                        <option value="05:15 PM - 06:00 PM">05:15 PM - 06:00 PM</option>
+                        <option value="06:00 PM - 06:45 PM">06:00 PM - 06:45 PM</option>
+                        <option value="06:45 PM - 07:30 PM">06:45 PM - 07:30 PM</option>
+                        <option value="07:15 PM - 08:00 PM">07:15 PM - 08:00 PM</option>
                       </optgroup>
                     </select>
                   </div>
+                  <span class="form-error" id="timeError">Please select an available time slot.</span>
                 </div>
               </div>
 
@@ -1235,6 +1243,10 @@
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             <span>Book New</span>
           </button>
+          <button type="button" class="btn btn-sm btn-logout-exit" id="btnClientPortalLogout" title="Log Out &amp; Exit to Home">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span>Log Out / Exit</span>
+          </button>
           <button type="button" class="client-modal-close" id="clientBookingsModalClose" aria-label="Close My Bookings">&times;</button>
         </div>
       </div>
@@ -1290,9 +1302,12 @@
         </div>
       </div>
 
-      <!-- Admin Section Navigation (Appointments / Stylists / Services / Analytics / Feedback / Waiting List) -->
+      <!-- Admin Section Navigation (Dispatch / Appointments / Stylists / Services / Analytics / Feedback / Waiting List / Clients) -->
       <div class="admin-section-nav" id="adminSectionNav" role="tablist" aria-label="Admin dashboard sections">
-        <button type="button" class="admin-section-btn active" data-section="appointments" role="tab" aria-selected="true">Appointments</button>
+        <button type="button" class="admin-section-btn active" data-section="dispatch" id="adminTabDispatch" role="tab" aria-selected="true">
+          <span class="live-dot" style="margin-right:6px;width:7px;height:7px;display:inline-block;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;"></span>Dispatch Board
+        </button>
+        <button type="button" class="admin-section-btn" data-section="appointments" role="tab" aria-selected="false">Appointments Stream</button>
         <button type="button" class="admin-section-btn" data-section="stylists" role="tab" aria-selected="false">Stylists</button>
         <button type="button" class="admin-section-btn" data-section="services" role="tab" aria-selected="false">Services</button>
         <button type="button" class="admin-section-btn" data-section="analytics" role="tab" aria-selected="false">Analytics</button>
@@ -1301,8 +1316,15 @@
         <button type="button" class="admin-section-btn" data-section="clients" id="adminTabClients" role="tab" aria-selected="false">Clients</button>
       </div>
 
+      <!-- SECTION: REAL-TIME DAY-VIEW DISPATCH BOARD -->
+      <div class="admin-section active" id="adminSectionDispatch" role="tabpanel">
+        <div class="admin-panel-body" id="dispatchPanel" style="padding: 16px 20px;">
+          <p class="admin-panel-loading">Loading live dispatch board…</p>
+        </div>
+      </div>
+
       <!-- SECTION: APPOINTMENTS (existing dispatch dashboard) -->
-      <div class="admin-section active" id="adminSectionAppointments" role="tabpanel">
+      <div class="admin-section" id="adminSectionAppointments" role="tabpanel" hidden>
       <!-- Admin Stats KPI Ribbon -->
       <div class="admin-kpi-ribbon">
         <div class="admin-kpi-card" data-kpi="total">
@@ -1588,6 +1610,172 @@
     </div>
   </div>
 
+  <!-- =========================================================================
+       ADMIN EDIT APPOINTMENT MODAL
+       ========================================================================= -->
+  <div class="client-modal-overlay edit-apt-modal-overlay" id="adminEditAptModalOverlay" role="dialog" aria-modal="true" aria-labelledby="adminEditAptModalTitle" aria-hidden="true" style="z-index: 10040;">
+    <div class="client-modal edit-apt-modal" style="max-width: 680px; width: 95%;">
+      <div class="client-modal-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div class="client-header-title-wrap">
+          <div class="client-brand-pill">
+            <span class="user-avatar-dot" style="background:#8B6F47;"></span>
+            <span>APPOINTMENT CONTROL</span>
+          </div>
+          <h2 class="client-modal-title" id="adminEditAptModalTitle">Edit Appointment</h2>
+          <p class="client-modal-subtitle" id="adminEditAptSubtitle">Update customer booking, stylist assignment, or scheduled time slot</p>
+        </div>
+        <div class="client-header-controls">
+          <button type="button" class="client-modal-close" id="adminEditAptModalClose" aria-label="Close edit appointment modal">&times;</button>
+        </div>
+      </div>
+      <form id="adminEditAptForm" style="padding: 1.5rem;">
+        <input type="hidden" id="editAptId" value="">
+        <div class="form-row" style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1;">
+            <label for="editAptClientName" class="form-label">Client Name <span class="required">*</span></label>
+            <input type="text" id="editAptClientName" class="form-input" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="editAptPhone" class="form-label">Phone Number <span class="required">*</span></label>
+            <input type="tel" id="editAptPhone" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-row" style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1;">
+            <label for="editAptEmail" class="form-label">Email Address</label>
+            <input type="email" id="editAptEmail" class="form-input">
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="editAptService" class="form-label">Service <span class="required">*</span></label>
+            <select id="editAptService" class="form-input form-select" required>
+              <option value="Hair Cut">Hair Cut</option>
+              <option value="Hair Coloring">Hair Coloring</option>
+              <option value="Hair Styling">Hair Styling</option>
+              <option value="Hair Treatment">Hair Treatment</option>
+              <option value="Bridal Styling">Bridal Styling</option>
+              <option value="Facial &amp; Beauty Care">Facial &amp; Beauty Care</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1;">
+            <label for="editAptDate" class="form-label">Appointment Date <span class="required">*</span></label>
+            <input type="date" id="editAptDate" class="form-input" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="editAptTimeSlot" class="form-label">Time Slot <span class="required">*</span></label>
+            <select id="editAptTimeSlot" class="form-input form-select" required></select>
+          </div>
+        </div>
+        <div class="form-row" style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1;">
+            <label for="editAptStylist" class="form-label">Assigned Stylist</label>
+            <select id="editAptStylist" class="form-input form-select">
+              <option value="">Auto-Assign Available Stylist</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="editAptStatus" class="form-label">Booking Status</label>
+            <select id="editAptStatus" class="form-input form-select">
+              <option value="pending">⏳ Pending</option>
+              <option value="review">👀 Under Review</option>
+              <option value="confirmed">✓ Confirmed</option>
+              <option value="completed">✅ Completed</option>
+              <option value="cancelled">✕ Cancelled</option>
+              <option value="waiting_list">⏳ Waiting List</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="editAptVisitStatus" class="form-label">Visit Status</label>
+            <select id="editAptVisitStatus" class="form-input form-select">
+              <option value="scheduled">Scheduled</option>
+              <option value="checked_in">Checked In</option>
+              <option value="completed">Completed</option>
+              <option value="no_show">No Show</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label for="editAptCustNotes" class="form-label">Customer Requests / Notes</label>
+          <textarea id="editAptCustNotes" class="form-input" rows="2"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label for="editAptAdminNote" class="form-label">Salon Management Confirmation Note</label>
+          <input type="text" id="editAptAdminNote" class="form-input" placeholder="Note seen by customer...">
+        </div>
+        <div class="feedback-form-alert" id="editAptAlert" style="display:none; margin-bottom:14px;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn btn-secondary" id="btnCancelEditApt">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnSaveEditApt">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       STAFF BLOCK-OUT MODAL (Time Ranges & Reasons)
+       ========================================================================= -->
+  <div class="client-modal-overlay block-modal-overlay" id="adminBlockOutModalOverlay" role="dialog" aria-modal="true" aria-labelledby="adminBlockOutModalTitle" aria-hidden="true" style="z-index: 10045;">
+    <div class="client-modal block-modal" style="max-width: 600px; width: 95%;">
+      <div class="client-modal-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div class="client-header-title-wrap">
+          <div class="client-brand-pill">
+            <span class="user-avatar-dot" style="background:#dc2626;"></span>
+            <span>STAFF SCHEDULE BLOCK-OUT</span>
+          </div>
+          <h2 class="client-modal-title" id="adminBlockOutModalTitle">Record Staff Block-Out</h2>
+          <p class="client-modal-subtitle">Prevent appointments for a stylist during breaks, training, or unavailable time ranges</p>
+        </div>
+        <div class="client-header-controls">
+          <button type="button" class="client-modal-close" id="adminBlockOutModalClose" aria-label="Close block-out modal">&times;</button>
+        </div>
+      </div>
+      <form id="adminBlockOutModalForm" style="padding: 1.5rem;">
+        <div class="form-group" style="margin-bottom:12px;">
+          <label for="blockModalStylist" class="form-label">Staff Member / Stylist <span class="required">*</span></label>
+          <select id="blockModalStylist" class="form-input form-select" required></select>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label for="blockModalDate" class="form-label">Block-Out Date <span class="required">*</span></label>
+          <input type="date" id="blockModalDate" class="form-input" required>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label">Block Range Type <span class="required">*</span></label>
+          <div style="display:flex; gap:16px; margin-top:6px;">
+            <label style="font-size:0.875rem; display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="radio" name="blockRangeType" value="range" checked> Time Range
+            </label>
+            <label style="font-size:0.875rem; display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="radio" name="blockRangeType" value="single"> Single Slot
+            </label>
+            <label style="font-size:0.875rem; display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="radio" name="blockRangeType" value="allDay"> Entire Day
+            </label>
+          </div>
+        </div>
+        <div class="form-row" id="blockRangeSlotsRow" style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1;" id="blockStartGroup">
+            <label for="blockModalStartSlot" class="form-label">From Slot <span class="required">*</span></label>
+            <select id="blockModalStartSlot" class="form-input form-select"></select>
+          </div>
+          <div class="form-group" style="flex:1;" id="blockEndGroup">
+            <label for="blockModalEndSlot" class="form-label">To Slot <span class="required">*</span></label>
+            <select id="blockModalEndSlot" class="form-input form-select"></select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label for="blockModalReason" class="form-label">Reason for Absence / Block <span class="required">*</span></label>
+          <input type="text" id="blockModalReason" class="form-input" placeholder="e.g. Doctor's appointment, Training session, Emergency leave" required>
+        </div>
+        <div class="feedback-form-alert" id="blockModalAlert" style="display:none; margin-bottom:14px;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn btn-secondary" id="btnCancelBlockModal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnSaveBlockModal" style="background:#dc2626; border-color:#dc2626;">Save Block-Out</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ============================================================
        EmailJS SDK — Loaded & Initialized
        Public Key  : 9eSv834wmzyWcbeHt
@@ -1610,4 +1798,3 @@
   <script src="admin-panel.js"></script>
 </body>
 </html>
-

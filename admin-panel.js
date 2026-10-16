@@ -123,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ------------------------------------------------------- section switching
   const sectionNav = document.getElementById('adminSectionNav');
   const sectionMap = {
+    dispatch: document.getElementById('adminSectionDispatch'),
     appointments: document.getElementById('adminSectionAppointments'),
     stylists: document.getElementById('adminSectionStylists'),
     services: document.getElementById('adminSectionServices'),
@@ -132,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clients: document.getElementById('adminSectionClients')
   };
   const loaders = {
+    dispatch: () => renderDispatchBoardPanel(),
     stylists: () => renderStylistsPanel(),
     services: () => renderServicesPanel(),
     analytics: () => renderAnalyticsPanel(),
@@ -140,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
     waitingList: () => renderWaitingListPanel(),
     clients: () => renderClientsPanel()
   };
-  let activeSection = 'appointments';
+  let activeSection = 'dispatch';
 
   function switchSection(name) {
     const targetKey = (name === 'waitingList') ? 'waiting-list' : name;
@@ -187,6 +189,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Explicit direct click listener for "Dispatch" tab
+  const directDispatchButtons = document.querySelectorAll('.admin-section-btn[data-section="dispatch"], #adminTabDispatch');
+  directDispatchButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      console.log('[Admin Dashboard] Dispatch Board tab button clicked directly.');
+      switchSection('dispatch');
+    });
+  });
+
   // Explicit direct click listener for "Waiting List" tab
   const directWlButtons = document.querySelectorAll('.admin-section-btn[data-section="waiting-list"], #adminTabWaitingList');
   directWlButtons.forEach(btn => {
@@ -232,6 +243,732 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const retry = root.querySelector('.ap-retry-btn');
     if (retry) retry.addEventListener('click', () => loaders[activeSection] && loaders[activeSection]());
+  }
+
+  // ============================================================
+  // 0. REAL-TIME DAY-VIEW DISPATCH BOARD PANEL
+  // ============================================================
+  let dispatchDate = new Date().toISOString().split('T')[0];
+  let dispatchPollingInterval = null;
+  let dispatchDataCache = null;
+
+  async function renderDispatchBoardPanel() {
+    const root = panelRoot('dispatchPanel');
+    if (!root) return;
+
+    // Start background polling every 15 seconds for real-time operations
+    if (!dispatchPollingInterval) {
+      dispatchPollingInterval = setInterval(() => {
+        if (activeSection === 'dispatch') {
+          const modal = document.getElementById('adminModalOverlay');
+          if (modal && modal.classList.contains('show')) {
+            loadDispatchData(false);
+          }
+        }
+      }, 15000);
+    }
+
+    await loadDispatchData(true);
+  }
+
+  async function loadDispatchData(showLoading = false) {
+    const root = panelRoot('dispatchPanel');
+    if (!root) return;
+    if (showLoading && !dispatchDataCache) {
+      root.innerHTML = '<p class="admin-panel-loading" style="padding:40px; text-align:center;">Loading live dispatch board…</p>';
+    }
+
+    try {
+      const data = await api(`/dispatch/board?date=${encodeURIComponent(dispatchDate)}`);
+      dispatchDataCache = data;
+      drawDispatchBoard(root, data);
+    } catch (err) {
+      if (showLoading) panelError(root, err);
+    }
+  }
+
+  function drawDispatchBoard(root, data) {
+    const { board = [], unassigned = [], summary = {}, date = dispatchDate } = data;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isToday = (date === todayStr);
+
+    let html = `
+      <div class="dispatch-toolbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px; background:#fff; padding:12px 18px; border-radius:10px; border:1px solid #e9e2d8; box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="display:flex; align-items:center; gap:6px; background:#f0fdf4; border:1px solid #bbf7d0; padding:5px 10px; border-radius:20px;">
+            <span class="live-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#16a34a; box-shadow:0 0 8px #16a34a;"></span>
+            <span style="font-size:11.5px; font-weight:700; color:#166534; letter-spacing:0.04em;">LIVE MONITORING</span>
+          </div>
+          <span style="font-size:1.05rem; font-weight:700; color:#3d2f1f; font-family:var(--font-serif, 'Playfair Display', serif);">
+            Day Dispatch: <span style="color:#8B6F47;">${escapeHtml(date)}</span> ${isToday ? '<span style="font-size:0.75rem; background:#8B6F47; color:#fff; padding:2px 7px; border-radius:10px; margin-left:4px;">Today</span>' : ''}
+          </span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn-admin-action" id="btnDispatchPrevDay" title="Previous Day">◀ Prev</button>
+          <button type="button" class="btn-admin-action" id="btnDispatchToday" title="Jump to Today">Today</button>
+          <button type="button" class="btn-admin-action" id="btnDispatchNextDay" title="Next Day">Next ▶</button>
+          <input type="date" id="dispatchDateInput" value="${escapeHtml(date)}" style="padding:6px 10px; font-size:13px; border:1px solid #d8cdb9; border-radius:6px;">
+          <button type="button" class="btn-admin-action" id="btnDispatchRefresh" title="Refresh Live Data" style="background:#f8f5f0; border-color:#d8cdb9;">
+            ⟳ Refresh
+          </button>
+          <button type="button" class="btn-admin-action" id="btnDispatchAddBlock" style="background:#fee2e2; border-color:#fca5a5; color:#991b1b; font-weight:600;">
+            ⛔ Record Block-Out
+          </button>
+        </div>
+      </div>
+
+      <!-- Daily KPI Ribbon -->
+      <div class="admin-kpi-ribbon" style="margin-bottom:16px;">
+        <div class="admin-kpi-card">
+          <span class="kpi-label">Day Total Bookings</span>
+          <span class="kpi-value" style="color:#1e293b;">${summary.total || 0}</span>
+        </div>
+        <div class="admin-kpi-card">
+          <span class="kpi-label">Scheduled</span>
+          <span class="kpi-value" style="color:#7c3aed;">${summary.scheduled || 0}</span>
+        </div>
+        <div class="admin-kpi-card highlight-pending">
+          <span class="kpi-label">Checked In</span>
+          <span class="kpi-value" style="color:#2563eb;">${summary.checkedIn || 0}</span>
+        </div>
+        <div class="admin-kpi-card highlight-confirmed">
+          <span class="kpi-label">Completed</span>
+          <span class="kpi-value" style="color:#16a34a;">${summary.completed || 0}</span>
+        </div>
+        <div class="admin-kpi-card">
+          <span class="kpi-label">No-Show</span>
+          <span class="kpi-value" style="color:#dc2626;">${summary.noShow || 0}</span>
+        </div>
+        <div class="admin-kpi-card">
+          <span class="kpi-label">Stylists on Duty</span>
+          <span class="kpi-value" style="color:#0f766e;">${summary.stylistsOnDuty || 0} / ${summary.totalStylists || 10}</span>
+        </div>
+      </div>
+    `;
+
+    // Unassigned bookings queue if any
+    if (unassigned && unassigned.length > 0) {
+      html += `
+        <div class="dispatch-col-unassigned" style="margin-bottom:16px; padding:12px 16px; background:#fffbeb; border:1.5px dashed #f59e0b; border-radius:10px;">
+          <h4 style="margin:0 0 8px; font-size:13px; font-weight:700; color:#b45309; display:flex; align-items:center; gap:6px;">
+            ⚠️ Unassigned Bookings (${unassigned.length}) — Drag and drop onto any stylist column below:
+          </h4>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            ${unassigned.map(a => renderDispatchCard(a, null)).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // Stylist Multi-Column Grid
+    html += `
+      <div class="dispatch-hint" style="margin-bottom:8px; font-size:12px; color:#6b7280; display:flex; justify-content:space-between; align-items:center;">
+        <span>💡 <strong>Tip:</strong> Drag appointment cards across columns or slots to reschedule/reassign. Use quick actions to check in, complete, or flag no-show.</span>
+        <span>Capacity limit: <strong>max 5 appointments per slot</strong></span>
+      </div>
+      <div class="dispatch-board" id="dispatchBoardGrid">
+    `;
+
+    board.forEach(s => {
+      const isOff = s.onDayOff;
+      const aptCount = (s.appointments || []).length;
+      const blockCount = (s.blocks || []).length;
+
+      html += `
+        <div class="dispatch-col ${isOff ? 'dispatch-col-off' : ''}" data-stylist-id="${s.stylistId}">
+          <div class="dispatch-col-header" style="background:#fff; border-radius:12px 12px 0 0; position:relative;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div>
+                <strong style="font-size:14px; color:#1e293b;">${escapeHtml(s.name)}</strong>
+                <span class="dispatch-col-spec">${escapeHtml(s.specialization || 'General Styling')}</span>
+              </div>
+              <span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:#f0e9df; color:#8B6F47; font-size:11px; font-weight:700;">
+                ${escapeHtml((s.name || 'S').charAt(0))}
+              </span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+              ${isOff
+                ? `<span class="dispatch-badge-off" title="${escapeHtml(s.offReason || 'Off duty')}">Off Duty</span>`
+                : `<span style="font-size:10.5px; font-weight:700; color:#166534; background:#dcfce7; padding:2px 8px; border-radius:12px;">On Duty</span>`}
+              <span style="font-size:11px; color:#6b7280;">${aptCount} apt${aptCount === 1 ? '' : 's'}${blockCount ? ` &bull; ${blockCount} blk` : ''}</span>
+            </div>
+          </div>
+
+          <div class="dispatch-col-body" data-drop-stylist="${s.stylistId}">
+            <!-- Active Block-Out chips for this stylist -->
+            ${(s.blocks || []).map(b => `
+              <div class="dispatch-block-chip" data-block-id="${b.id}" style="background:repeating-linear-gradient(45deg,#fff7ed,#fff7ed 8px,#ffedd5 8px,#ffedd5 16px); border:1.5px dashed #f59e0b; border-radius:8px; padding:7px 9px; margin-bottom:8px;">
+                <div style="font-size:11.5px; font-weight:700; color:#c2410c;">⛔ Blocked: ${escapeHtml(b.timeSlot)}</div>
+                ${b.reason ? `<div style="font-size:10.5px; color:#9a3412; margin-top:2px;">"${escapeHtml(b.reason)}"</div>` : ''}
+                <button type="button" class="btn-remove-block-chip" data-block-id="${b.id}" style="margin-top:5px; font-size:10px; padding:2px 6px; background:#fff; border:1px solid #fdba74; border-radius:4px; color:#c2410c; cursor:pointer;">✕ Remove Block</button>
+              </div>
+            `).join('')}
+
+            <!-- Appointment cards -->
+            ${(s.appointments && s.appointments.length > 0)
+              ? s.appointments.map(a => renderDispatchCard(a, s)).join('')
+              : (isOff ? '<div class="dispatch-empty" style="color:#991b1b; padding:20px 8px;">Stylist is off duty today</div>' : '<div class="dispatch-empty">No appointments scheduled</div>')
+            }
+          </div>
+        </div>
+      `;
+    });
+
+    html += `</div>`;
+    root.innerHTML = html;
+    bindDispatchEvents(root, data);
+  }
+
+  function renderDispatchCard(apt, stylist) {
+    const vStatus = apt.visitStatus || 'scheduled';
+    const isCompleted = vStatus === 'completed';
+    const isCheckedIn = vStatus === 'checked_in';
+    const isNoShow = vStatus === 'no_show';
+    const stylistId = stylist ? stylist.stylistId : (apt.stylistId || '');
+    const bookingCode = apt.bookingCode || '#' + apt.id;
+
+    return `
+      <div class="dispatch-card visit-${vStatus}" draggable="true"
+           data-apt-id="${apt.id}"
+           data-booking-code="${escapeHtml(bookingCode)}"
+           data-current-stylist="${stylistId}"
+           data-current-slot="${escapeHtml(apt.timeSlot || '')}">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="dispatch-card-time">⏰ ${escapeHtml(apt.timeSlot || 'Any Time')}</div>
+          <span style="font-size:11px; font-weight:700; color:#1d4ed8;">${escapeHtml(bookingCode)}</span>
+        </div>
+        <div class="dispatch-card-client">${escapeHtml(apt.clientName || 'Valued Client')}</div>
+        <div class="dispatch-card-meta">
+          <strong>${escapeHtml(apt.service || 'Service')}</strong> &bull;
+          <a href="tel:${escapeHtml(apt.clientPhone)}" style="color:#1d4ed8; text-decoration:none;">${escapeHtml(apt.clientPhone || '')}</a>
+        </div>
+        ${apt.customerNotes && apt.customerNotes !== 'None' ? `
+          <div style="font-size:11px; color:#78350f; margin-top:4px; background:#fef3c7; padding:3px 6px; border-radius:4px; border:1px solid #fde68a;">
+            "${escapeHtml(apt.customerNotes)}"
+          </div>
+        ` : ''}
+
+        <div class="dispatch-card-statuses" style="margin-top:6px;">
+          <span class="dispatch-status-pill st-${apt.status || 'pending'}">${escapeHtml(apt.status || 'pending')}</span>
+          <span class="dispatch-visit-pill visit-${vStatus}">${escapeHtml(vStatus.replace('_', ' '))}</span>
+        </div>
+
+        <!-- Quick Lifecycle Actions -->
+        <div class="dispatch-card-actions" style="margin-top:8px;">
+          <button type="button" class="btn-dispatch-visit" data-apt-id="${apt.id}" data-visit="checked_in" title="Check In Client" ${isCheckedIn ? 'disabled' : ''}>
+            ✓ Check In
+          </button>
+          <button type="button" class="btn-dispatch-visit" data-apt-id="${apt.id}" data-visit="completed" title="Complete Appointment" ${isCompleted ? 'disabled' : ''}>
+            ✅ Complete
+          </button>
+          <button type="button" class="btn-dispatch-visit dv-no-show" data-apt-id="${apt.id}" data-visit="no_show" title="Mark No-Show" ${isNoShow ? 'disabled' : ''}>
+            ⚠️ No-Show
+          </button>
+        </div>
+
+        <!-- Appointment Management Controls (Edit / Cancel / Delete) -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:6px; border-top:1px dashed #e9e2d8;">
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn-dispatch-edit" data-booking-code="${escapeHtml(bookingCode)}" title="Edit Appointment Details" style="font-size:11px; padding:3px 8px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:5px; cursor:pointer; font-weight:600;">
+              ✏️ Edit
+            </button>
+            <button type="button" class="btn-dispatch-cancel" data-apt-id="${apt.id}" title="Cancel Appointment" style="font-size:11px; padding:3px 8px; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; border-radius:5px; cursor:pointer; font-weight:600;">
+              ✕ Cancel
+            </button>
+          </div>
+          <button type="button" class="btn-dispatch-delete" data-apt-id="${apt.id}" title="Delete Record" style="font-size:12px; padding:3px 6px; background:transparent; border:none; color:#94a3b8; cursor:pointer;">
+            🗑
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindDispatchEvents(root, data) {
+    // Date navigation
+    const dateInput = root.querySelector('#dispatchDateInput');
+    const prevBtn = root.querySelector('#btnDispatchPrevDay');
+    const todayBtn = root.querySelector('#btnDispatchToday');
+    const nextBtn = root.querySelector('#btnDispatchNextDay');
+    const refreshBtn = root.querySelector('#btnDispatchRefresh');
+    const addBlockBtn = root.querySelector('#btnDispatchAddBlock');
+
+    if (dateInput) {
+      dateInput.addEventListener('change', () => {
+        dispatchDate = dateInput.value;
+        loadDispatchData(true);
+      });
+    }
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        const cur = new Date(dispatchDate);
+        cur.setDate(cur.getDate() - 1);
+        dispatchDate = cur.toISOString().split('T')[0];
+        loadDispatchData(true);
+      });
+    }
+
+    if (todayBtn) {
+      todayBtn.addEventListener('click', () => {
+        dispatchDate = new Date().toISOString().split('T')[0];
+        loadDispatchData(true);
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        const cur = new Date(dispatchDate);
+        cur.setDate(cur.getDate() + 1);
+        dispatchDate = cur.toISOString().split('T')[0];
+        loadDispatchData(true);
+      });
+    }
+
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => loadDispatchData(true));
+    }
+
+    if (addBlockBtn) {
+      addBlockBtn.addEventListener('click', () => openBlockOutModal());
+    }
+
+    // Remove block-out chips
+    root.querySelectorAll('.btn-remove-block-chip').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const blockId = btn.getAttribute('data-block-id');
+        if (!confirm('Remove this staff block-out time?')) return;
+        try {
+          await api(`/stylists/blocks/${blockId}`, { method: 'DELETE' });
+          loadDispatchData(false);
+          refreshStylistCounts();
+        } catch (err) {
+          alert('Failed to remove block-out: ' + err.message);
+        }
+      });
+    });
+
+    // Quick visit status buttons (Check-In / Complete / No-Show)
+    root.querySelectorAll('.btn-dispatch-visit').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const aptId = btn.getAttribute('data-apt-id');
+        const visitStatus = btn.getAttribute('data-visit');
+        try {
+          btn.disabled = true;
+          await api(`/appointments/${encodeURIComponent(aptId)}/visit`, {
+            method: 'PATCH',
+            body: JSON.stringify({ visitStatus })
+          });
+          loadDispatchData(false);
+          window.dispatchEvent(new CustomEvent('salon:appointment_updated'));
+        } catch (err) {
+          alert('Failed to update visit status: ' + err.message);
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // Edit button click
+    root.querySelectorAll('.btn-dispatch-edit').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const code = btn.getAttribute('data-booking-code');
+        openAdminEditAppointmentModal(code);
+      });
+    });
+
+    // Cancel button click
+    root.querySelectorAll('.btn-dispatch-cancel').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const aptId = btn.getAttribute('data-apt-id');
+        if (!confirm(`Cancel appointment #${aptId}? This will free the calendar slot and notify the customer.`)) return;
+        try {
+          await api(`/appointments/${encodeURIComponent(aptId)}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'cancelled', adminNote: 'Cancelled by salon administration.' })
+          });
+          loadDispatchData(false);
+          window.dispatchEvent(new CustomEvent('salon:appointment_updated'));
+        } catch (err) {
+          alert('Cancellation failed: ' + err.message);
+        }
+      });
+    });
+
+    // Delete button click
+    root.querySelectorAll('.btn-dispatch-delete').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const aptId = btn.getAttribute('data-apt-id');
+        if (!confirm(`Permanently delete appointment #${aptId} from database?`)) return;
+        try {
+          await api(`/appointments/${encodeURIComponent(aptId)}`, { method: 'DELETE' });
+          loadDispatchData(false);
+          window.dispatchEvent(new CustomEvent('salon:appointment_updated'));
+        } catch (err) {
+          alert('Deletion failed: ' + err.message);
+        }
+      });
+    });
+
+    // HTML5 Drag and Drop across stylists & slots
+    root.querySelectorAll('.dispatch-card[draggable="true"]').forEach(card => {
+      card.addEventListener('dragstart', (e) => {
+        const aptId = card.getAttribute('data-apt-id');
+        const bookingCode = card.getAttribute('data-booking-code');
+        const fromStylist = card.getAttribute('data-current-stylist');
+        const fromSlot = card.getAttribute('data-current-slot');
+        e.dataTransfer.setData('text/plain', JSON.stringify({ aptId, bookingCode, fromStylist, fromSlot }));
+        card.style.opacity = '0.5';
+      });
+
+      card.addEventListener('dragend', () => {
+        card.style.opacity = '1';
+        root.querySelectorAll('.dispatch-col').forEach(c => c.classList.remove('drag-over'));
+      });
+    });
+
+    root.querySelectorAll('.dispatch-col-body').forEach(dropZone => {
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const col = dropZone.closest('.dispatch-col');
+        if (col) col.classList.add('drag-over');
+      });
+
+      dropZone.addEventListener('dragleave', () => {
+        const col = dropZone.closest('.dispatch-col');
+        if (col) col.classList.remove('drag-over');
+      });
+
+      dropZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        const col = dropZone.closest('.dispatch-col');
+        if (col) col.classList.remove('drag-over');
+
+        const raw = e.dataTransfer.getData('text/plain');
+        if (!raw) return;
+
+        let dragData;
+        try { dragData = JSON.parse(raw); } catch (_) { return; }
+
+        const targetStylistId = dropZone.getAttribute('data-drop-stylist');
+        const aptId = dragData.aptId;
+        const currentSlot = dragData.fromSlot;
+
+        // Prompt or select target slot
+        let targetSlot = prompt(`Assign appointment #${dragData.bookingCode} to this stylist.\nConfirm or enter target time slot:`, currentSlot || TIME_SLOTS[0]);
+        if (!targetSlot) return; // cancelled
+        targetSlot = targetSlot.trim();
+
+        try {
+          const res = await api('/dispatch/reassign-reschedule', {
+            method: 'PATCH',
+            body: JSON.stringify({
+              id: aptId,
+              targetDate: dispatchDate,
+              targetSlot: targetSlot,
+              targetStylistId: Number(targetStylistId)
+            })
+          });
+
+          loadDispatchData(false);
+          window.dispatchEvent(new CustomEvent('salon:appointment_updated'));
+        } catch (err) {
+          alert('Reassignment/Reschedule failed: ' + err.message);
+        }
+      });
+    });
+  }
+
+  // ============================================================
+  // EDIT APPOINTMENT MODAL HANDLER
+  // ============================================================
+  const adminEditAptModalOverlay = document.getElementById('adminEditAptModalOverlay');
+  const adminEditAptModalClose = document.getElementById('adminEditAptModalClose');
+  const adminEditAptForm = document.getElementById('adminEditAptForm');
+  const btnCancelEditApt = document.getElementById('btnCancelEditApt');
+
+  function closeAdminEditAptModal() {
+    if (!adminEditAptModalOverlay) return;
+    adminEditAptModalOverlay.classList.remove('show');
+    adminEditAptModalOverlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  if (adminEditAptModalClose) adminEditAptModalClose.addEventListener('click', closeAdminEditAptModal);
+  if (btnCancelEditApt) btnCancelEditApt.addEventListener('click', closeAdminEditAptModal);
+  if (adminEditAptModalOverlay) {
+    adminEditAptModalOverlay.addEventListener('click', (e) => {
+      if (e.target === adminEditAptModalOverlay) closeAdminEditAptModal();
+    });
+  }
+
+  async function openAdminEditAppointmentModal(aptOrCode) {
+    if (!adminEditAptModalOverlay || !adminEditAptForm) return;
+
+    let apt = aptOrCode;
+    if (typeof aptOrCode === 'string' || typeof aptOrCode === 'number') {
+      try {
+        const data = await api(`/invoice/${encodeURIComponent(aptOrCode)}`);
+        apt = data.invoice || { id: aptOrCode, bookingCode: aptOrCode };
+      } catch (e) {
+        apt = { id: aptOrCode, bookingCode: aptOrCode };
+      }
+    }
+
+    // Ensure stylistsCache is populated
+    if (!stylistsCache || stylistsCache.length === 0) {
+      try {
+        const sData = await api('/stylists/admin');
+        stylistsCache = sData.stylists || [];
+      } catch (_) {}
+    }
+
+    // Populate Stylist options in Edit Modal
+    const stylistSelect = document.getElementById('editAptStylist');
+    if (stylistSelect) {
+      stylistSelect.innerHTML = '<option value="">Auto-Assign Available Stylist</option>' +
+        stylistsCache.filter(s => s.is_active !== 0).map(s => `
+          <option value="${s.id}">${escapeHtml(s.name)} (${escapeHtml(s.specialization || 'Stylist')})</option>
+        `).join('');
+    }
+
+    // Populate Time Slot options
+    const slotSelect = document.getElementById('editAptTimeSlot');
+    if (slotSelect) {
+      slotSelect.innerHTML = TIME_SLOTS.map(t => `
+        <option value="${t}">${t}</option>
+      `).join('');
+    }
+
+    // Set values
+    const aptId = apt.id || apt.bookingCode || apt.booking_code;
+    document.getElementById('editAptId').value = aptId;
+    document.getElementById('editAptClientName').value = apt.clientName || apt.client_name || apt.name || '';
+    document.getElementById('editAptPhone').value = apt.clientPhone || apt.client_phone || apt.phone || '';
+    document.getElementById('editAptEmail').value = apt.clientEmail || apt.client_email || apt.email || '';
+    if (document.getElementById('editAptService')) document.getElementById('editAptService').value = apt.service || apt.serviceName || apt.service_name || 'Hair Cut';
+    if (document.getElementById('editAptDate')) document.getElementById('editAptDate').value = apt.date || apt.appointmentDate || apt.appointment_date || new Date().toISOString().split('T')[0];
+    if (slotSelect) slotSelect.value = apt.timeSlot || apt.time || apt.time_slot || TIME_SLOTS[0];
+    if (stylistSelect) stylistSelect.value = apt.stylistId || apt.stylist_id || '';
+    if (document.getElementById('editAptStatus')) document.getElementById('editAptStatus').value = apt.status || 'pending';
+    if (document.getElementById('editAptVisitStatus')) document.getElementById('editAptVisitStatus').value = apt.visitStatus || apt.visit_status || 'scheduled';
+    if (document.getElementById('editAptCustNotes')) document.getElementById('editAptCustNotes').value = apt.customerNotes || apt.customer_notes || apt.message || '';
+    if (document.getElementById('editAptAdminNote')) document.getElementById('editAptAdminNote').value = apt.adminNote || apt.admin_note || '';
+
+    const alertBox = document.getElementById('editAptAlert');
+    if (alertBox) alertBox.style.display = 'none';
+
+    adminEditAptModalOverlay.classList.add('show');
+    adminEditAptModalOverlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  window.openAdminEditAppointmentModal = openAdminEditAppointmentModal;
+
+  if (adminEditAptForm) {
+    adminEditAptForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const aptId = document.getElementById('editAptId').value;
+      const alertBox = document.getElementById('editAptAlert');
+      const saveBtn = document.getElementById('btnSaveEditApt');
+
+      const payload = {
+        clientName: document.getElementById('editAptClientName').value,
+        clientPhone: document.getElementById('editAptPhone').value,
+        clientEmail: document.getElementById('editAptEmail').value,
+        service: document.getElementById('editAptService').value,
+        date: document.getElementById('editAptDate').value,
+        time: document.getElementById('editAptTimeSlot').value,
+        stylistId: document.getElementById('editAptStylist').value || null,
+        status: document.getElementById('editAptStatus').value,
+        visitStatus: document.getElementById('editAptVisitStatus').value,
+        customerNotes: document.getElementById('editAptCustNotes').value,
+        adminNote: document.getElementById('editAptAdminNote').value
+      };
+
+      try {
+        if (saveBtn) saveBtn.disabled = true;
+        await api(`/appointments/${encodeURIComponent(aptId)}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+
+        closeAdminEditAptModal();
+        try {
+          const raw = localStorage.getItem('salon_hair_bird_appointments');
+          if (raw) {
+            const arr = JSON.parse(raw);
+            const idx = arr.findIndex(x => String(x.id) === String(aptId) || String(x.bookingCode) === String(aptId));
+            if (idx !== -1) {
+              arr[idx] = {
+                ...arr[idx],
+                name: payload.clientName,
+                phone: payload.clientPhone,
+                email: payload.clientEmail,
+                service: payload.service,
+                date: payload.date,
+                time: payload.time,
+                stylistId: payload.stylistId,
+                status: payload.status,
+                visitStatus: payload.visitStatus,
+                message: payload.customerNotes,
+                adminNote: payload.adminNote,
+                updatedAt: new Date().toISOString()
+              };
+              localStorage.setItem('salon_hair_bird_appointments', JSON.stringify(arr));
+            }
+          }
+        } catch (_) {}
+        if (activeSection === 'dispatch') loadDispatchData(false);
+        window.dispatchEvent(new CustomEvent('salon:appointment_updated'));
+      } catch (err) {
+        if (alertBox) {
+          alertBox.textContent = err.message;
+          alertBox.style.display = 'block';
+        } else {
+          alert(err.message);
+        }
+      } finally {
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    });
+  }
+
+  // ============================================================
+  // STAFF BLOCK-OUT MODAL HANDLER (TIME RANGES & REASONS)
+  // ============================================================
+  const adminBlockOutModalOverlay = document.getElementById('adminBlockOutModalOverlay');
+  const adminBlockOutModalClose = document.getElementById('adminBlockOutModalClose');
+  const adminBlockOutModalForm = document.getElementById('adminBlockOutModalForm');
+  const btnCancelBlockModal = document.getElementById('btnCancelBlockModal');
+
+  function closeBlockOutModal() {
+    if (!adminBlockOutModalOverlay) return;
+    adminBlockOutModalOverlay.classList.remove('show');
+    adminBlockOutModalOverlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  if (adminBlockOutModalClose) adminBlockOutModalClose.addEventListener('click', closeBlockOutModal);
+  if (btnCancelBlockModal) btnCancelBlockModal.addEventListener('click', closeBlockOutModal);
+  if (adminBlockOutModalOverlay) {
+    adminBlockOutModalOverlay.addEventListener('click', (e) => {
+      if (e.target === adminBlockOutModalOverlay) closeBlockOutModal();
+    });
+  }
+
+  async function openBlockOutModal(prefillStylistId = null) {
+    if (!adminBlockOutModalOverlay || !adminBlockOutModalForm) return;
+
+    if (!stylistsCache || stylistsCache.length === 0) {
+      try {
+        const sData = await api('/stylists/admin');
+        stylistsCache = sData.stylists || [];
+      } catch (_) {}
+    }
+
+    const stylistSelect = document.getElementById('blockModalStylist');
+    if (stylistSelect) {
+      stylistSelect.innerHTML = stylistsCache.filter(s => s.is_active !== 0).map(s => `
+        <option value="${s.id}" ${prefillStylistId && s.id === Number(prefillStylistId) ? 'selected' : ''}>
+          ${escapeHtml(s.name)} (${escapeHtml(s.specialization || 'Stylist')})
+        </option>
+      `).join('');
+    }
+
+    const startSlot = document.getElementById('blockModalStartSlot');
+    const endSlot = document.getElementById('blockModalEndSlot');
+    if (startSlot && endSlot) {
+      const slotOpts = TIME_SLOTS.map(t => `<option value="${t}">${t}</option>`).join('');
+      startSlot.innerHTML = slotOpts;
+      endSlot.innerHTML = slotOpts;
+      endSlot.value = TIME_SLOTS[Math.min(3, TIME_SLOTS.length - 1)];
+    }
+
+    const dateInput = document.getElementById('blockModalDate');
+    if (dateInput) dateInput.value = dispatchDate || new Date().toISOString().split('T')[0];
+
+    const alertBox = document.getElementById('blockModalAlert');
+    if (alertBox) alertBox.style.display = 'none';
+
+    // Range type radio toggles
+    const rangeRadios = adminBlockOutModalForm.querySelectorAll('input[name="blockRangeType"]');
+    const rangeRow = document.getElementById('blockRangeSlotsRow');
+    const endGroup = document.getElementById('blockEndGroup');
+    const updateRangeVisibility = () => {
+      const checked = adminBlockOutModalForm.querySelector('input[name="blockRangeType"]:checked')?.value || 'range';
+      if (checked === 'allDay') {
+        if (rangeRow) rangeRow.style.display = 'none';
+      } else if (checked === 'single') {
+        if (rangeRow) rangeRow.style.display = 'flex';
+        if (endGroup) endGroup.style.display = 'none';
+        const startLbl = document.querySelector('label[for="blockModalStartSlot"]');
+        if (startLbl) startLbl.textContent = 'Select Slot *';
+      } else {
+        if (rangeRow) rangeRow.style.display = 'flex';
+        if (endGroup) endGroup.style.display = 'block';
+        const startLbl = document.querySelector('label[for="blockModalStartSlot"]');
+        if (startLbl) startLbl.textContent = 'From Slot *';
+      }
+    };
+    rangeRadios.forEach(r => r.addEventListener('change', updateRangeVisibility));
+    updateRangeVisibility();
+
+    adminBlockOutModalOverlay.classList.add('show');
+    adminBlockOutModalOverlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  window.openAdminBlockOutModal = openBlockOutModal;
+
+  if (adminBlockOutModalForm) {
+    adminBlockOutModalForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const alertBox = document.getElementById('blockModalAlert');
+      const saveBtn = document.getElementById('btnSaveBlockModal');
+
+      const stylistId = Number(document.getElementById('blockModalStylist').value);
+      const date = document.getElementById('blockModalDate').value;
+      const reason = document.getElementById('blockModalReason').value;
+      const rangeType = adminBlockOutModalForm.querySelector('input[name="blockRangeType"]:checked')?.value || 'range';
+
+      const payload = { stylistId, date, reason };
+      if (rangeType === 'allDay') {
+        payload.allDay = true;
+      } else if (rangeType === 'single') {
+        payload.timeSlot = document.getElementById('blockModalStartSlot').value;
+      } else {
+        payload.startSlot = document.getElementById('blockModalStartSlot').value;
+        payload.endSlot = document.getElementById('blockModalEndSlot').value;
+      }
+
+      try {
+        if (saveBtn) saveBtn.disabled = true;
+        await api('/stylists/blocks', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+
+        closeBlockOutModal();
+        if (activeSection === 'dispatch') loadDispatchData(false);
+        if (activeSection === 'stylists') renderStylistsPanel();
+        refreshStylistCounts();
+      } catch (err) {
+        if (alertBox) {
+          alertBox.textContent = err.message;
+          alertBox.style.display = 'block';
+        } else {
+          alert(err.message);
+        }
+      } finally {
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    });
   }
 
   // ============================================================
@@ -443,24 +1180,38 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await api(`/stylists/blocks?stylistId=${stylistId}`);
       const blocks = data.blocks || [];
       area.innerHTML = `
-        <h5 class="ap-blocks-title">Block-Out Times (breaks / training / unavailable)</h5>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+          <h5 class="ap-blocks-title" style="margin:0;">Block-Out Times (breaks / leave / unavailable)</h5>
+          <button type="button" class="btn btn-secondary btn-xs ap-open-range-modal" data-stylist="${stylistId}" style="font-size:0.75rem; padding:4px 9px;">
+            + Range / All-Day Block
+          </button>
+        </div>
         <form class="ap-block-form" data-block-form="${stylistId}">
           <input type="date" class="form-input" name="date" required min="${new Date().toISOString().split('T')[0]}">
           <select class="form-input" name="timeSlot" required>
             <option value="">Select time slot…</option>
             ${TIME_SLOTS.map(t => `<option value="${t}">${t}</option>`).join('')}
           </select>
-          <input type="text" class="form-input" name="reason" placeholder="Reason (optional)" maxlength="255">
+          <input type="text" class="form-input" name="reason" placeholder="Reason (e.g. Leave, Lunch, Training)" maxlength="255">
           <button type="submit" class="btn btn-primary btn-sm">Add Block</button>
         </form>
         ${blocks.length ? `
           <ul class="ap-block-list">
             ${blocks.map(b => `
               <li class="ap-block-item">
-                <span><strong>${escapeHtml(b.blockDate)}</strong> · ${escapeHtml(b.timeSlot)}${b.reason ? ` — ${escapeHtml(b.reason)}` : ''}</span>
+                <span><strong>${escapeHtml(b.blockDate)}</strong> · ${escapeHtml(b.timeSlot)}${b.reason ? ` — <em>${escapeHtml(b.reason)}</em>` : ''}</span>
                 <button type="button" class="btn-admin-icon ap-remove-block" data-block-id="${b.id}" title="Remove block-out" aria-label="Remove block-out">&times;</button>
               </li>`).join('')}
           </ul>` : '<p class="ap-muted">No block-out times recorded.</p>'}`;
+
+      const openRangeBtn = area.querySelector('.ap-open-range-modal');
+      if (openRangeBtn) {
+        openRangeBtn.addEventListener('click', () => {
+          if (typeof openBlockOutModal === 'function') {
+            openBlockOutModal(stylistId);
+          }
+        });
+      }
 
       const form = area.querySelector('form[data-block-form]');
       if (form) form.addEventListener('submit', async (ev) => {
@@ -473,6 +1224,7 @@ document.addEventListener('DOMContentLoaded', () => {
           });
           loadBlocksFor(stylistId);
           refreshStylistCounts();
+          if (typeof loadDispatchData === 'function') loadDispatchData(false);
         } catch (err2) { alert(err2.message); }
       });
 
@@ -482,6 +1234,7 @@ document.addEventListener('DOMContentLoaded', () => {
           await api(`/stylists/blocks/${btn.getAttribute('data-block-id')}`, { method: 'DELETE' });
           loadBlocksFor(stylistId);
           refreshStylistCounts();
+          if (typeof loadDispatchData === 'function') loadDispatchData(false);
         } catch (err2) { alert(err2.message); }
       }));
     } catch (err) {
@@ -1600,13 +2353,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     html += `
       <div class="ap-table-wrap">
-        <table class="ap-table" style="min-width: 700px;">
+        <table class="ap-table" style="min-width: 760px;">
           <thead>
             <tr>
               <th>Client Name</th>
               <th>Phone Number</th>
               <th>Email Address</th>
               <th style="text-align: center;">Total Visits</th>
+              <th style="text-align: right;">Total Expenditure</th>
               <th>Last Visit</th>
               <th style="text-align: right;">Service History</th>
             </tr>
@@ -1616,6 +2370,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clientsCache.forEach(client => {
       const visits = Number(client.totalVisits) || 0;
+      const spent = fmtMoney(client.totalSpent || 0);
       const lastVisit = client.lastVisitDate
         ? `<span style="color:#374151; font-weight:500;">${escapeHtml(client.lastVisitDate)}</span>`
         : '<span style="color:#9ca3af;">—</span>';
@@ -1647,6 +2402,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <span style="display:inline-block; padding:3px 10px; border-radius:12px; font-size:0.78rem; font-weight:700; ${badgeStyle}">
               ${visits} visit${visits === 1 ? '' : 's'}
             </span>
+          </td>
+          <td style="text-align:right; font-weight:700; color:#065f46; white-space:nowrap;">
+            ${spent}
           </td>
           <td>${lastVisit}</td>
           <td style="text-align:right;">
@@ -1768,7 +2526,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let modalHtml = `
         <!-- Client Quick Profile Bar -->
-        <div class="ap-client-profile-card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; padding: 16px; background: #f8f5f0; border: 1px solid #e2d9c8; border-radius: 10px;">
+        <div class="ap-client-profile-card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; padding: 16px; background: #f8f5f0; border: 1px solid #e2d9c8; border-radius: 10px;">
           <div>
             <span style="font-size: 0.7rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.06em; font-weight: 600;">Client Full Name</span>
             <div style="font-size: 1rem; font-weight: 700; color: #0f172a; margin-top: 3px;">${escapeHtml(client.name || 'Valued Customer')}</div>
@@ -1785,17 +2543,117 @@ document.addEventListener('DOMContentLoaded', () => {
             <span style="font-size: 0.7rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.06em; font-weight: 600;">Lifetime Visits</span>
             <div style="font-size: 1.1rem; font-weight: 700; color: #a88555; margin-top: 3px;">${history.length} visit${history.length === 1 ? '' : 's'}</div>
           </div>
+          <div>
+            <span style="font-size: 0.7rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.06em; font-weight: 600;">Total Expenditure</span>
+            <div style="font-size: 1.15rem; font-weight: 700; color: #065f46; margin-top: 3px;">${fmtMoney(client.totalSpent || 0)}</div>
+          </div>
         </div>
 
-        <!-- Notes, Allergies & Formulas (if any) -->
-        <div class="ap-client-notes-card" style="margin-bottom: 22px; padding: 14px 16px; background: #fffbeb; border-left: 3px solid #c5a880; border-radius: 0 8px 8px 0; border-top: 1px solid #fde68a; border-right: 1px solid #fde68a; border-bottom: 1px solid #fde68a;">
-          <strong style="font-size: 0.8rem; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">Client Medical Notes &amp; Allergies</strong>
-          <div style="font-size: 0.875rem; line-height: 1.6; color: #374151;">
+        <!-- Notes, Allergies & Formulas Card (Editable) -->
+        <div class="ap-client-notes-card" style="margin-bottom: 22px; padding: 16px; background: #fffbeb; border-left: 4px solid #c5a880; border-radius: 0 8px 8px 0; border-top: 1px solid #fde68a; border-right: 1px solid #fde68a; border-bottom: 1px solid #fde68a;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <strong style="font-size: 0.82rem; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.05em;">Client Medical Notes, Allergies &amp; Hair Formulas</strong>
+            <button type="button" class="btn btn-secondary btn-xs" id="btnToggleEditClientNotes" style="font-size:0.75rem; padding:4px 9px; cursor:pointer;">
+              ✏️ Edit Notes
+            </button>
+          </div>
+          <div id="clientNotesDisplay" style="font-size: 0.875rem; line-height: 1.6; color: #374151;">
             ${client.allergies
-              ? `<p style="margin: 0 0 6px;"><strong style="color:#b91c1c;">Known Allergies:</strong> ${escapeHtml(client.allergies)}</p>`
+              ? `<p style="margin: 0 0 6px;"><strong style="color:#b91c1c;">Known Allergies:</strong> <span>${escapeHtml(client.allergies)}</span></p>`
               : '<p style="margin: 0 0 6px; color:#6b7280; font-style:italic;">No known chemical/product allergies recorded.</p>'}
-            ${client.colorFormulaNotes ? `<p style="margin: 0 0 6px;"><strong style="color:#0369a1;">Hair Color Formula:</strong> ${escapeHtml(client.colorFormulaNotes)}</p>` : ''}
-            ${client.generalNotes ? `<p style="margin: 0;"><strong style="color:#374151;">General Preferences:</strong> ${escapeHtml(client.generalNotes)}</p>` : ''}
+            ${client.colorFormulaNotes
+              ? `<p style="margin: 0 0 6px;"><strong style="color:#0369a1;">Hair Color Formula:</strong> <span>${escapeHtml(client.colorFormulaNotes)}</span></p>`
+              : '<p style="margin: 0 0 6px; color:#6b7280; font-style:italic;">No hair color formula specified.</p>'}
+            ${client.generalNotes
+              ? `<p style="margin: 0;"><strong style="color:#374151;">General Preferences:</strong> <span>${escapeHtml(client.generalNotes)}</span></p>`
+              : ''}
+          </div>
+          <form id="clientNotesForm" style="display:none; margin-top:12px; padding-top:12px; border-top:1px dashed #fde68a;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+              <div>
+                <label style="font-size:0.75rem; font-weight:600; color:#b91c1c; display:block; margin-bottom:4px;">Known Allergies (Chemicals, Dyes, Latex, etc.)</label>
+                <input type="text" class="form-input" id="editClientAllergies" value="${escapeHtml(client.allergies || '')}" placeholder="e.g. Ammonia, PPD, Latex..." style="font-size:0.85rem; width:100%;">
+              </div>
+              <div>
+                <label style="font-size:0.75rem; font-weight:600; color:#0369a1; display:block; margin-bottom:4px;">Hair Color Formula / Technical Mix</label>
+                <input type="text" class="form-input" id="editClientFormula" value="${escapeHtml(client.colorFormulaNotes || '')}" placeholder="e.g. 7N + 20vol (1:1), 35 mins" style="font-size:0.85rem; width:100%;">
+              </div>
+            </div>
+            <div style="margin-bottom:10px;">
+              <label style="font-size:0.75rem; font-weight:600; color:#374151; display:block; margin-bottom:4px;">General Preferences &amp; Styling History Notes</label>
+              <textarea class="form-input" id="editClientGeneralNotes" rows="2" placeholder="e.g. Sensitive scalp, prefers warm water..." style="font-size:0.85rem; width:100%;">${escapeHtml(client.generalNotes || '')}</textarea>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+              <button type="button" class="btn btn-secondary btn-xs" id="btnCancelEditNotes">Cancel</button>
+              <button type="submit" class="btn btn-primary btn-xs" id="btnSaveClientNotes">Save Notes</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Before & After Photos Section -->
+        <div class="ap-client-photos-section" style="margin-bottom: 24px; padding: 16px; background: #ffffff; border: 1px solid #e2d9c8; border-radius: 10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px; flex-wrap:wrap; gap:8px;">
+            <div>
+              <h4 style="margin:0 0 2px; font-size:1rem; font-weight:700; color:#1e293b;">Before &amp; After Photo Gallery</h4>
+              <p style="margin:0; font-size:0.8rem; color:#64748b;">Visual transformation portfolio and consultation records for this client.</p>
+            </div>
+            <button type="button" class="btn btn-primary btn-xs" id="btnToggleAddPhotoForm" style="font-size:0.78rem;">+ Add Photo</button>
+          </div>
+
+          <!-- Add Photo Form (Hidden by default) -->
+          <form id="clientAddPhotoForm" style="display:none; margin-bottom:16px; padding:14px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px;">
+            <div style="display:grid; grid-template-columns: 140px 1fr 1fr; gap:10px; margin-bottom:10px;">
+              <div>
+                <label style="font-size:0.75rem; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Photo Type *</label>
+                <select id="newPhotoType" class="form-input" style="font-size:0.85rem; width:100%;">
+                  <option value="before">Before Photo</option>
+                  <option value="after">After Photo</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:0.75rem; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Upload Image File (Device)</label>
+                <input type="file" id="newPhotoFileInput" accept="image/*" class="form-input" style="font-size:0.8rem; width:100%; padding:5px;">
+              </div>
+              <div>
+                <label style="font-size:0.75rem; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Or Image URL</label>
+                <input type="text" id="newPhotoUrlInput" class="form-input" placeholder="https://..." style="font-size:0.85rem; width:100%;">
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr auto; gap:10px; align-items:center;">
+              <div>
+                <input type="text" id="newPhotoCaption" class="form-input" placeholder="Photo caption (e.g. Pre-color consultation, Highlights after toner...)" style="font-size:0.85rem; width:100%;">
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button type="button" class="btn btn-secondary btn-xs" id="btnCancelAddPhoto">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-xs" id="btnSubmitPhoto">Upload &amp; Save</button>
+              </div>
+            </div>
+            <div id="newPhotoPreviewSlot" style="margin-top:10px; display:none;">
+              <img id="newPhotoImagePreview" src="" alt="Preview" style="max-height:100px; border-radius:6px; border:1px solid #e2e8f0; object-fit:cover;">
+            </div>
+          </form>
+
+          <!-- Photo Grid -->
+          <div class="client-photos-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:12px;">
+            ${(data.photos && data.photos.length) ? data.photos.map(p => `
+              <div class="client-photo-card" style="position:relative; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; background:#fafafa; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <span style="position:absolute; top:6px; left:6px; z-index:2; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; ${p.photoType === 'before' ? 'background:#fef3c7; color:#92400e; border:1px solid #fde68a;' : 'background:#d1fae5; color:#065f46; border:1px solid #a7f3d0;'}">
+                  ${p.photoType === 'before' ? 'Before' : 'After'}
+                </span>
+                <button type="button" class="btn-delete-client-photo" data-photo-id="${p.id}" title="Delete photo" style="position:absolute; top:6px; right:6px; z-index:2; background:rgba(0,0,0,0.6); color:#fff; border:none; width:24px; height:24px; border-radius:50%; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center;">&times;</button>
+                <a href="${escapeHtml(p.photoUrl)}" target="_blank" rel="noopener noreferrer" style="display:block;">
+                  <img src="${escapeHtml(p.photoUrl)}" alt="${escapeHtml(p.caption || 'Client Photo')}" style="width:100%; height:130px; object-fit:cover; display:block;" onerror="this.src='https://via.placeholder.com/200x130?text=No+Preview';">
+                </a>
+                <div style="padding:8px 10px; font-size:0.75rem; color:#475569;">
+                  <div style="font-weight:600; color:#1e293b; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    ${escapeHtml(p.caption || (p.photoType === 'before' ? 'Initial Consultation' : 'Completed Style'))}
+                  </div>
+                  <div style="color:#94a3b8; font-size:0.7rem;">
+                    ${p.uploadedAt ? new Date(p.uploadedAt).toLocaleDateString() : ''}
+                  </div>
+                </div>
+              </div>
+            `).join('') : '<p style="grid-column: 1 / -1; color:#94a3b8; font-size:0.85rem; font-style:italic; padding:12px 0;">No before &amp; after photos uploaded yet for this client.</p>'}
           </div>
         </div>
       `;
@@ -1844,7 +2702,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const notes = item.customerNotes || item.adminNote || '—';
           const displayStatus = visitStatus === 'completed' ? 'Completed' : status;
 
-          // Status badges — all dark text on pale colour backgrounds for light modal
+          // Status badges
           let badgeStyle = 'background:#fef9c3; color:#854d0e; border:1px solid #fde68a;'; // pending
           if (visitStatus === 'completed') {
             badgeStyle = 'background:#dcfce7; color:#166534; border:1px solid #bbf7d0;';
@@ -1903,6 +2761,141 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       clientHistoryModalBody.innerHTML = modalHtml;
+
+      // Inline Notes Form Toggle & Save Handler
+      const btnToggleNotes = clientHistoryModalBody.querySelector('#btnToggleEditClientNotes');
+      const btnCancelNotes = clientHistoryModalBody.querySelector('#btnCancelEditNotes');
+      const notesForm = clientHistoryModalBody.querySelector('#clientNotesForm');
+      const notesDisplay = clientHistoryModalBody.querySelector('#clientNotesDisplay');
+
+      if (btnToggleNotes && notesForm) {
+        btnToggleNotes.addEventListener('click', () => {
+          const isHidden = notesForm.style.display === 'none';
+          notesForm.style.display = isHidden ? 'block' : 'none';
+          btnToggleNotes.textContent = isHidden ? '✕ Close Form' : '✏️ Edit Notes';
+        });
+      }
+      if (btnCancelNotes && notesForm) {
+        btnCancelNotes.addEventListener('click', () => {
+          notesForm.style.display = 'none';
+          if (btnToggleNotes) btnToggleNotes.textContent = '✏️ Edit Notes';
+        });
+      }
+      if (notesForm) {
+        notesForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const saveBtn = notesForm.querySelector('#btnSaveClientNotes');
+          const allergiesVal = (notesForm.querySelector('#editClientAllergies')?.value || '').trim();
+          const formulaVal = (notesForm.querySelector('#editClientFormula')?.value || '').trim();
+          const generalVal = (notesForm.querySelector('#editClientGeneralNotes')?.value || '').trim();
+
+          try {
+            if (saveBtn) saveBtn.disabled = true;
+            await api(`/clients/${clientId}/notes`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                allergies: allergiesVal,
+                colorFormulaNotes: formulaVal,
+                generalNotes: generalVal
+              })
+            });
+            // Refresh modal to show updated data
+            openClientHistoryModal(clientId);
+          } catch (nErr) {
+            alert('Failed to save notes: ' + nErr.message);
+          } finally {
+            if (saveBtn) saveBtn.disabled = false;
+          }
+        });
+      }
+
+      // Photo Upload & Form Handlers
+      const btnTogglePhoto = clientHistoryModalBody.querySelector('#btnToggleAddPhotoForm');
+      const btnCancelPhoto = clientHistoryModalBody.querySelector('#btnCancelAddPhoto');
+      const photoForm = clientHistoryModalBody.querySelector('#clientAddPhotoForm');
+      const fileInput = clientHistoryModalBody.querySelector('#newPhotoFileInput');
+      const previewSlot = clientHistoryModalBody.querySelector('#newPhotoPreviewSlot');
+      const imgPreview = clientHistoryModalBody.querySelector('#newPhotoImagePreview');
+      let loadedFileDataUrl = '';
+
+      if (btnTogglePhoto && photoForm) {
+        btnTogglePhoto.addEventListener('click', () => {
+          const isHidden = photoForm.style.display === 'none';
+          photoForm.style.display = isHidden ? 'block' : 'none';
+          btnTogglePhoto.textContent = isHidden ? '✕ Close Form' : '+ Add Photo';
+        });
+      }
+      if (btnCancelPhoto && photoForm) {
+        btnCancelPhoto.addEventListener('click', () => {
+          photoForm.style.display = 'none';
+          if (btnTogglePhoto) btnTogglePhoto.textContent = '+ Add Photo';
+          loadedFileDataUrl = '';
+          if (previewSlot) previewSlot.style.display = 'none';
+        });
+      }
+      if (fileInput) {
+        fileInput.addEventListener('change', () => {
+          const file = fileInput.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (re) => {
+              loadedFileDataUrl = re.target.result;
+              if (imgPreview && previewSlot) {
+                imgPreview.src = loadedFileDataUrl;
+                previewSlot.style.display = 'block';
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+      if (photoForm) {
+        photoForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const submitBtn = photoForm.querySelector('#btnSubmitPhoto');
+          const photoType = photoForm.querySelector('#newPhotoType')?.value || 'before';
+          const urlInput = (photoForm.querySelector('#newPhotoUrlInput')?.value || '').trim();
+          const caption = (photoForm.querySelector('#newPhotoCaption')?.value || '').trim();
+          const finalUrl = loadedFileDataUrl || urlInput;
+
+          if (!finalUrl) {
+            alert('Please select an image file to upload or enter an image URL.');
+            return;
+          }
+
+          try {
+            if (submitBtn) submitBtn.disabled = true;
+            await api(`/clients/${clientId}/photos`, {
+              method: 'POST',
+              body: JSON.stringify({
+                photoType,
+                photoUrl: finalUrl,
+                caption
+              })
+            });
+            openClientHistoryModal(clientId);
+          } catch (pErr) {
+            alert('Failed to save photo: ' + pErr.message);
+          } finally {
+            if (submitBtn) submitBtn.disabled = false;
+          }
+        });
+      }
+
+      // Delete Photo Handler
+      clientHistoryModalBody.querySelectorAll('.btn-delete-client-photo').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const pId = btn.getAttribute('data-photo-id');
+          if (!confirm('Are you sure you want to remove this client photo?')) return;
+          try {
+            await api(`/clients/${clientId}/photos/${pId}`, { method: 'DELETE' });
+            openClientHistoryModal(clientId);
+          } catch (dErr) {
+            alert('Failed to remove photo: ' + dErr.message);
+          }
+        });
+      });
 
       // Attach click listeners for View Invoice buttons in Service History
       clientHistoryModalBody.querySelectorAll('.btn-view-invoice').forEach(btn => {
